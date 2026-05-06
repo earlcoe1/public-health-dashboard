@@ -99,12 +99,16 @@ if uploaded_file:
     min_age = int(df["Age"].min())
     max_age = int(df["Age"].max())
 
-    age_filter = st.sidebar.slider(
-        "Filter by Age",
-        min_value=min_age,
-        max_value=max_age,
-        value=(min_age, max_age)
-    )
+    if min_age == max_age:
+        st.sidebar.info(f"All records have the same age value: {min_age}")
+        age_filter = (min_age, max_age)
+    else:
+        age_filter = st.sidebar.slider(
+            "Filter by Age",
+            min_value=min_age,
+            max_value=max_age,
+            value=(min_age, max_age)
+        )
 
     filtered_df = df.copy()
 
@@ -136,6 +140,7 @@ if uploaded_file:
     st.subheader("1. Distribution of Patient Outcomes by Age")
 
     fig1, ax1 = plt.subplots()
+
     for outcome in filtered_df["Outcome"].dropna().unique():
         subset = filtered_df[filtered_df["Outcome"] == outcome]
         ax1.hist(subset["Age"], alpha=0.6, label=str(outcome))
