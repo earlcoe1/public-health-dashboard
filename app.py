@@ -40,20 +40,29 @@ if uploaded_file is not None:
     st.subheader("Tail of Dataset")
     st.dataframe(df.tail(), use_container_width=True)
 
-    # 3. Display summary statistics for numerical data
+    # 3. Display summary statistics for selected numerical data only
     st.header("3. Summary of Statistical Properties on Numerical Data")
 
-    numeric_df = df.select_dtypes(include=["number"])
+    summary_columns = ["Age", "Length_of_Stay", "Satisfaction"]
 
-    if not numeric_df.empty:
-        st.dataframe(numeric_df.describe(), use_container_width=True)
+    available_summary_columns = [
+        col for col in summary_columns if col in df.columns
+    ]
+
+    if available_summary_columns:
+        st.dataframe(
+            df[available_summary_columns].describe(),
+            use_container_width=True
+        )
     else:
-        st.warning("No numerical columns were found in the dataset.")
+        st.warning(
+            "No required numerical columns were found. "
+            "Expected columns include Age, Length_of_Stay, and Satisfaction."
+        )
 
     # 4. Calculate and display admissions per month
     st.header("4. Number of Admissions Per Month")
 
-    # Flexible date column detection
     possible_date_columns = [
         "Admission_Date",
         "Date of Admission",
@@ -72,32 +81,37 @@ if uploaded_file is not None:
 
     if date_column is not None:
         df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
-
         df = df.dropna(subset=[date_column])
 
-        df["Month-Year"] = df[date_column].dt.to_period("M").astype(str)
-
         monthly_admissions = (
-            df.groupby("Month-Year")
+            df.groupby(df[date_column].dt.to_period("M"))
             .size()
             .reset_index(name="Number of Admissions")
         )
 
-        st.dataframe(monthly_admissions, use_container_width=True)
+        monthly_admissions[date_column] = monthly_admissions[date_column].astype(str)
+
+        monthly_admissions = monthly_admissions.rename(
+            columns={date_column: "Month-Year"}
+        )
+
+        st.dataframe(
+            monthly_admissions,
+            use_container_width=True,
+            hide_index=True
+        )
 
         # 5. Visualize monthly admissions
         st.header("5. Monthly Admissions Visualization")
 
         fig, ax = plt.subplots(figsize=(12, 5))
 
-        ax.plot(
+        ax.bar(
             monthly_admissions["Month-Year"],
-            monthly_admissions["Number of Admissions"],
-            marker="o",
-            linewidth=2
+            monthly_admissions["Number of Admissions"]
         )
 
-        ax.set_title("Monthly Patient Admissions Over Time")
+        ax.set_title("Monthly Patient Admissions")
         ax.set_xlabel("Month-Year")
         ax.set_ylabel("Number of Admissions")
         plt.xticks(rotation=45)
@@ -105,9 +119,9 @@ if uploaded_file is not None:
         st.pyplot(fig)
 
         st.write(
-            "The chart shows monthly patient admission trends over time. "
-            "It helps identify periods with high and low hospital admissions, "
-            "which can support hospital staffing, resource planning, and operational decision-making."
+            "The chart shows the number of patient admissions for each month. "
+            "It helps identify months with higher or lower hospital admissions, "
+            "which can support staffing, resource allocation, and hospital planning."
         )
 
     else:
