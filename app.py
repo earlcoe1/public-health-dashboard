@@ -115,7 +115,7 @@ class HealthAnalyzer:
 
     def admissions_per_month(self):
         if not self.date_column:
-            return pd.DataFrame()
+            return pd.DataFrame(columns=["Month-Year", "Number of Admissions"])
 
         monthly = (
             self.df.dropna(subset=[self.date_column])
@@ -128,9 +128,11 @@ class HealthAnalyzer:
         monthly = monthly.rename(columns={self.date_column: "Month-Year"})
         monthly = monthly.sort_values("Month-Year")
 
+        # Remove incomplete final month if it is unusually low
         if len(monthly) > 1:
             last_value = monthly["Number of Admissions"].iloc[-1]
             avg_previous = monthly["Number of Admissions"].iloc[:-1].mean()
+
             if last_value < avg_previous * 0.5:
                 monthly = monthly.iloc[:-1]
 
@@ -138,10 +140,17 @@ class HealthAnalyzer:
 
     def disease_counts(self):
         if "Disease" in self.df.columns:
-            return self.df["Disease"].value_counts().reset_index().head(10).rename(
-                columns={"index": "Disease", "Disease": "Cases"}
+            disease_df = (
+                self.df["Disease"]
+                .value_counts()
+                .head(10)
+                .reset_index()
             )
-        return pd.DataFrame()
+
+            disease_df.columns = ["Disease", "Cases"]
+            return disease_df
+
+        return pd.DataFrame(columns=["Disease", "Cases"])
 
     def satisfaction_by_department(self):
         if "Department" in self.df.columns and "Satisfaction" in self.df.columns:
@@ -152,7 +161,8 @@ class HealthAnalyzer:
                 .reset_index()
                 .sort_values("Satisfaction", ascending=False)
             )
-        return pd.DataFrame()
+
+        return pd.DataFrame(columns=["Department", "Satisfaction"])
 
     def length_of_stay_by_department(self):
         if "Department" in self.df.columns and "Length_of_Stay" in self.df.columns:
@@ -163,7 +173,8 @@ class HealthAnalyzer:
                 .reset_index()
                 .sort_values("Length_of_Stay", ascending=False)
             )
-        return pd.DataFrame()
+
+        return pd.DataFrame(columns=["Department", "Length_of_Stay"])
 
 
 # -----------------------------
@@ -231,46 +242,52 @@ if uploaded_file is not None:
     filtered_df = df.copy()
 
     if "Gender" in df.columns:
+        gender_options = sorted(df["Gender"].dropna().unique())
         gender = st.sidebar.multiselect(
             "Gender",
-            options=sorted(df["Gender"].dropna().unique()),
-            default=sorted(df["Gender"].dropna().unique())
+            options=gender_options,
+            default=gender_options
         )
         filtered_df = filtered_df[filtered_df["Gender"].isin(gender)]
 
     if "Department" in df.columns:
+        department_options = sorted(df["Department"].dropna().unique())
         department = st.sidebar.multiselect(
             "Department",
-            options=sorted(df["Department"].dropna().unique()),
-            default=sorted(df["Department"].dropna().unique())
+            options=department_options,
+            default=department_options
         )
         filtered_df = filtered_df[filtered_df["Department"].isin(department)]
 
     if "Disease" in df.columns:
+        disease_options = sorted(df["Disease"].dropna().unique())
         disease = st.sidebar.multiselect(
             "Disease",
-            options=sorted(df["Disease"].dropna().unique()),
-            default=sorted(df["Disease"].dropna().unique())
+            options=disease_options,
+            default=disease_options
         )
         filtered_df = filtered_df[filtered_df["Disease"].isin(disease)]
 
     if "Outcome" in df.columns:
+        outcome_options = sorted(df["Outcome"].dropna().unique())
         outcome = st.sidebar.multiselect(
             "Outcome",
-            options=sorted(df["Outcome"].dropna().unique()),
-            default=sorted(df["Outcome"].dropna().unique())
+            options=outcome_options,
+            default=outcome_options
         )
         filtered_df = filtered_df[filtered_df["Outcome"].isin(outcome)]
 
-    if "Age" in df.columns:
+    if "Age" in df.columns and not df["Age"].dropna().empty:
         min_age = int(df["Age"].min())
         max_age = int(df["Age"].max())
+
         age_range = st.sidebar.slider(
             "Age Range",
             min_value=min_age,
             max_value=max_age,
             value=(min_age, max_age)
         )
+
         filtered_df = filtered_df[
             (filtered_df["Age"] >= age_range[0]) &
             (filtered_df["Age"] <= age_range[1])
@@ -314,7 +331,7 @@ if uploaded_file is not None:
             kpi_card("Mortality Rate", "N/A")
 
     # -----------------------------
-    # Data Preview
+    # Dataset Preview
     # -----------------------------
     st.header("Dataset Preview")
 
@@ -326,7 +343,7 @@ if uploaded_file is not None:
         st.dataframe(filtered_df.tail(), use_container_width=True)
 
     # -----------------------------
-    # Summary Statistics
+    # Numerical Summary
     # -----------------------------
     st.header("Numerical Summary")
 
@@ -364,7 +381,7 @@ if uploaded_file is not None:
         )
 
     # -----------------------------
-    # Admissions Over Time
+    # Admissions Trend Analysis
     # -----------------------------
     st.header("Admissions Trend Analysis")
 
@@ -384,13 +401,20 @@ if uploaded_file is not None:
             markers=True,
             title="Monthly Patient Admissions Over Time"
         )
-        fig.update_layout(xaxis_tickangle=-45)
+
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            xaxis_title="Month-Year",
+            yaxis_title="Number of Admissions",
+            title_x=0.5
+        )
+
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("No valid date column was found for monthly admissions.")
 
     # -----------------------------
-    # Age Distribution
+    # Patient Demographic Analysis
     # -----------------------------
     st.header("Patient Demographic Analysis")
 
@@ -402,10 +426,19 @@ if uploaded_file is not None:
             title="Patient Age Distribution",
             labels={"Age": "Patient Age"}
         )
+
+        fig.update_layout(
+            title_x=0.5,
+            xaxis_title="Age",
+            yaxis_title="Number of Patients"
+        )
+
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Age column not found for demographic analysis.")
 
     # -----------------------------
-    # Outcomes by Age
+    # Patient Outcomes by Age
     # -----------------------------
     if "Outcome" in filtered_df.columns and "Age" in filtered_df.columns:
         fig = px.histogram(
@@ -416,16 +449,26 @@ if uploaded_file is not None:
             barmode="overlay",
             title="Patient Outcomes Distribution by Age"
         )
+
+        fig.update_layout(
+            title_x=0.5,
+            xaxis_title="Age",
+            yaxis_title="Number of Patients"
+        )
+
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Outcome and Age columns are required for outcomes-by-age analysis.")
 
     # -----------------------------
-    # Disease Burden
+    # Disease Burden Analysis
     # -----------------------------
     st.header("Disease Burden Analysis")
 
     diseases = filtered_analyzer.disease_counts()
 
-    if not diseases.empty:
+    if not diseases.empty and "Disease" in diseases.columns and "Cases" in diseases.columns:
+
         fig = px.bar(
             diseases,
             x="Cases",
@@ -434,13 +477,28 @@ if uploaded_file is not None:
             title="Top 10 Most Common Diseases or Conditions",
             text="Cases"
         )
-        fig.update_layout(yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig, use_container_width=True)
+
+        fig.update_layout(
+            yaxis=dict(autorange="reversed"),
+            xaxis_title="Number of Cases",
+            yaxis_title="Disease",
+            title_x=0.5
+        )
+
+        fig.update_traces(
+            textposition="outside"
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
     else:
-        st.warning("Disease column not found.")
+        st.warning("Disease data is not available for this chart.")
 
     # -----------------------------
-    # Operational Efficiency
+    # Operational Efficiency Analysis
     # -----------------------------
     st.header("Operational Efficiency Analysis")
 
@@ -454,6 +512,13 @@ if uploaded_file is not None:
             title="Average Length of Stay by Department",
             text="Length_of_Stay"
         )
+
+        fig.update_layout(
+            title_x=0.5,
+            xaxis_title="Department",
+            yaxis_title="Average Length of Stay"
+        )
+
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Department and Length_of_Stay columns are required.")
@@ -473,12 +538,19 @@ if uploaded_file is not None:
             title="Average Service Satisfaction by Department",
             text="Satisfaction"
         )
+
+        fig.update_layout(
+            title_x=0.5,
+            xaxis_title="Department",
+            yaxis_title="Average Satisfaction Rating"
+        )
+
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Department and Satisfaction columns are required.")
 
     # -----------------------------
-    # Outcome Distribution
+    # Patient Outcome Summary
     # -----------------------------
     st.header("Patient Outcome Summary")
 
@@ -496,10 +568,17 @@ if uploaded_file is not None:
             values="Count",
             title="Patient Outcome Distribution"
         )
+
+        fig.update_layout(
+            title_x=0.5
+        )
+
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Outcome column not found.")
 
     # -----------------------------
-    # Executive Insights
+    # Key Findings
     # -----------------------------
     st.header("Key Findings and Actionable Insights")
 
