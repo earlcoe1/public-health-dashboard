@@ -1,23 +1,11 @@
-# ================================
-# PROFESSIONAL STREAMLIT HEALTHCARE DASHBOARD
-# Enhanced UI + Visualizations
-# ================================
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# -------------------------------
-# Page Configuration
-# -------------------------------
 st.set_page_config(page_title="Healthcare Analytics Dashboard", layout="wide")
 
 st.title("🏥 Healthcare Patient Analytics Dashboard")
-st.markdown("Upload your healthcare dataset for cleaning, analysis, and visualization.")
 
-# -------------------------------
-# File Upload
-# -------------------------------
 uploaded_file = st.file_uploader(
     "Upload your healthcare dataset (CSV or Excel)",
     type=["csv", "xlsx"]
@@ -25,9 +13,6 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
-    # -------------------------------
-    # Load Data
-    # -------------------------------
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
@@ -35,79 +20,78 @@ if uploaded_file is not None:
 
     st.success("Dataset uploaded successfully!")
 
-    # -------------------------------
-    # Data Cleaning
-    # -------------------------------
-    df["Admission_Date"] = pd.to_datetime(df["Date of Admission"], errors="coerce")
-    df["Discharge_Date"] = pd.to_datetime(df["Discharge Date"], errors="coerce")
+    # Remove extra spaces from column names
+    df.columns = df.columns.str.strip()
 
-    df["Disease"] = df["Medical Condition"]
-    df["Age"] = pd.to_numeric(df["Age"], errors="coerce")
-    df["Gender"] = df["Gender"]
-    df["Patient_Type"] = df["Admission Type"]
-    df["Department"] = df["Doctor"].fillna("General")
-    df["Outcome"] = df["Test Results"].fillna("Unknown")
+    st.subheader("Available Columns in Your Dataset")
+    st.write(list(df.columns))
 
-    # Calculate Length of Stay
+    # Helper function to find matching column names
+    def find_column(possible_names):
+        for name in possible_names:
+            if name in df.columns:
+                return name
+        return None
+
+    admission_col = find_column([
+        "Date of Admission",
+        "Admission Date",
+        "Admission_Date",
+        "admission_date"
+    ])
+
+    discharge_col = find_column([
+        "Discharge Date",
+        "Discharge_Date",
+        "discharge_date"
+    ])
+
+    disease_col = find_column([
+        "Medical Condition",
+        "Disease",
+        "Condition"
+    ])
+
+    if admission_col is None or discharge_col is None:
+        st.error("Admission or Discharge date column was not found. Check the column names shown above.")
+        st.stop()
+
+    df["Admission_Date"] = pd.to_datetime(df[admission_col], errors="coerce")
+    df["Discharge_Date"] = pd.to_datetime(df[discharge_col], errors="coerce")
+
     df["Length of Stay (Days)"] = (
         df["Discharge_Date"] - df["Admission_Date"]
     ).dt.days
 
-    # Fill missing Length of Stay
-    median_stay = df["Length of Stay (Days)"].median()
-    df["Length of Stay (Days)"] = df["Length of Stay (Days)"].fillna(median_stay)
+    df["Length of Stay (Days)"] = df["Length of Stay (Days)"].fillna(
+        df["Length of Stay (Days)"].median()
+    )
 
-    # Satisfaction score
-    df["Patient Satisfaction Score"] = (
-        df["Billing Amount"].rank(pct=True) * 5
-    ).round().clip(1, 5)
+    if disease_col:
+        df["Disease"] = df[disease_col]
+    else:
+        df["Disease"] = "Unknown"
 
-    # Remove duplicates
-    df = df.drop_duplicates()
+    if "Billing Amount" in df.columns:
+        df["Patient Satisfaction Score"] = (
+            df["Billing Amount"].rank(pct=True) * 5
+        ).round().clip(1, 5)
+    else:
+        df["Patient Satisfaction Score"] = 3
 
-    # Fill missing categorical fields
-    categorical_cols = ["Disease", "Outcome", "Department", "Gender", "Patient_Type"]
-    for col in categorical_cols:
-        df[col] = df[col].fillna(df[col].mode()[0])
-
-    # -------------------------------
-    # Dataset Preview
-    # -------------------------------
-    st.subheader("📄 Dataset Preview (Head)")
+    st.subheader("Dataset Preview - Head")
     st.dataframe(df.head())
 
-    st.subheader("📄 Dataset Preview (Tail)")
+    st.subheader("Dataset Preview - Tail")
     st.dataframe(df.tail())
 
-    # -------------------------------
-    # Numeric Summary
-    # -------------------------------
-    st.subheader("📊 Numeric Summary")
-    numeric_summary = df[
-        ["Age", "Length of Stay (Days)", "Patient Satisfaction Score"]
-    ].describe()
-    st.dataframe(numeric_summary)
+    st.subheader("Numeric Summary")
+    st.dataframe(
+        df[["Age", "Length of Stay (Days)", "Patient Satisfaction Score"]]
+        .describe()
+    )
 
-    # -------------------------------
-    # Categorical Summary
-    # -------------------------------
-    st.subheader("📋 Categorical Summary")
-
-    cat_summary = []
-    for col in categorical_cols:
-        cat_summary.append({
-            "Column": col,
-            "Unique Values": df[col].nunique(),
-            "Most Common Value": df[col].mode()[0]
-        })
-
-    cat_summary_df = pd.DataFrame(cat_summary)
-    st.dataframe(cat_summary_df)
-
-    # -------------------------------
-    # Monthly Admission Trends
-    # -------------------------------
-    st.subheader("📅 Monthly Admissions Trends")
+    st.subheader("Monthly Admissions Trends")
 
     df["Admission_Month"] = df["Admission_Date"].dt.to_period("M").astype(str)
     monthly_admissions = df.groupby("Admission_Month").size()
@@ -120,40 +104,14 @@ if uploaded_file is not None:
     plt.xticks(rotation=45)
     st.pyplot(fig1)
 
-    # -------------------------------
-    # Disease Distribution
-    # -------------------------------
-    st.subheader("🦠 Disease Distribution")
-
-    disease_counts = df["Disease"].value_counts()
+    st.subheader("Disease Distribution")
 
     fig2, ax2 = plt.subplots(figsize=(10, 5))
-    disease_counts.plot(kind="bar", ax=ax2)
-    ax2.set_title("Distribution of Diseases")
+    df["Disease"].value_counts().plot(kind="bar", ax=ax2)
+    ax2.set_title("Disease Distribution")
     ax2.set_xlabel("Disease")
     ax2.set_ylabel("Patient Count")
     plt.xticks(rotation=45)
     st.pyplot(fig2)
 
-    # -------------------------------
-    # Department Comparison
-    # -------------------------------
-    st.subheader("🏨 Department Comparison")
-
-    department_counts = df["Department"].value_counts()
-
-    fig3, ax3 = plt.subplots(figsize=(10, 5))
-    department_counts.plot(kind="bar", ax=ax3)
-    ax3.set_title("Patients by Department")
-    ax3.set_xlabel("Department")
-    ax3.set_ylabel("Patient Count")
-    plt.xticks(rotation=45)
-    st.pyplot(fig3)
-
-    # -------------------------------
-    # Final Dataset Shape
-    # -------------------------------
-    st.subheader("📌 Final Dataset Shape")
-    st.write(df.shape)
-
-    st.success("Dashboard analysis completed successfully!")
+    st.success("Dashboard completed successfully!")
