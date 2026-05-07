@@ -1,20 +1,19 @@
-# ==============================
-# CLEAN HEALTHCARE DATASET FOR STREAMLIT DASHBOARD
-# ==============================
 
 import pandas as pd
 import numpy as np
 from google.colab import files
 
+# Step 1: Upload healthcare dataset CSV
 uploaded = files.upload()
 
+# Step 2: Load uploaded file
 file_name = list(uploaded.keys())[0]
 df = pd.read_csv(file_name)
 
 print("Original Shape:", df.shape)
 print(df.columns)
 
-# Rename main columns
+# Step 3: Standardize main fields
 df["Admission_Date"] = pd.to_datetime(df["Date of Admission"], errors="coerce")
 df["Discharge_Date"] = pd.to_datetime(df["Discharge Date"], errors="coerce")
 
@@ -23,11 +22,12 @@ df["Age"] = pd.to_numeric(df["Age"], errors="coerce")
 df["Gender"] = df["Gender"]
 df["Patient_Type"] = df["Admission Type"]
 
-# Calculate Length of Stay
-df["Length_of_Stay"] = (df["Discharge_Date"] - df["Admission_Date"]).dt.days
-df["Length_of_Stay"] = df["Length_of_Stay"].abs()
+# Step 4: Calculate length of stay
+df["Length_of_Stay"] = (
+    df["Discharge_Date"] - df["Admission_Date"]
+).dt.days.abs()
 
-# Create proper departments based on disease
+# Step 5: Assign proper department based on disease
 def assign_department(condition):
     condition = str(condition).lower()
 
@@ -43,12 +43,14 @@ def assign_department(condition):
         return "Cardiology"
     elif "arthritis" in condition:
         return "Rheumatology"
+    elif "stroke" in condition:
+        return "Neurology"
     else:
         return "General Medicine"
 
 df["Department"] = df["Disease"].apply(assign_department)
 
-# Create outcome based on test results
+# Step 6: Create patient outcome from test results
 def assign_outcome(result):
     result = str(result).lower()
 
@@ -63,20 +65,22 @@ def assign_outcome(result):
 
 df["Outcome"] = df["Test Results"].apply(assign_outcome)
 
-# Create realistic satisfaction score
+# Step 7: Generate realistic service satisfaction scores
 np.random.seed(42)
+
 df["Satisfaction"] = np.random.choice(
     [1, 2, 3, 4, 5],
     size=len(df),
     p=[0.08, 0.12, 0.25, 0.35, 0.20]
 )
 
-# Extract year and month
+# Step 8: Extract year and month
 df["Year"] = df["Admission_Date"].dt.year
 df["Month"] = df["Admission_Date"].dt.month
 
-# Remove bad rows
+# Step 9: Remove duplicates and bad rows
 df = df.drop_duplicates()
+
 df = df.dropna(
     subset=[
         "Admission_Date",
@@ -91,7 +95,10 @@ df = df.dropna(
     ]
 )
 
-# Keep only final dashboard columns
+# Remove impossible stay values
+df = df[df["Length_of_Stay"] >= 0]
+
+# Step 10: Final dashboard-ready dataset
 df_clean = df[
     [
         "Admission_Date",
@@ -113,6 +120,8 @@ print(df_clean.head())
 print(df_clean["Department"].value_counts())
 print(df_clean["Disease"].value_counts())
 
+# Step 11: Save cleaned file
 df_clean.to_csv("clean_public_health_data.csv", index=False)
 
+# Step 12: Download cleaned file
 files.download("clean_public_health_data.csv")
