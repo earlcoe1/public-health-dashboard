@@ -74,11 +74,6 @@ class HealthAnalyzer:
             return self.df["Disease"].value_counts().head(10)
         return pd.Series(dtype=int)
 
-    def outcome_summary(self):
-        if "Outcome" in self.df.columns:
-            return self.df["Outcome"].value_counts()
-        return pd.Series(dtype=int)
-
     def satisfaction_by_department(self):
         if "Department" in self.df.columns and "Satisfaction" in self.df.columns:
             return self.df.groupby("Department")["Satisfaction"].mean().sort_values(ascending=False)
@@ -185,7 +180,27 @@ if uploaded_file is not None:
     else:
         c4.metric("Average Satisfaction", "N/A")
 
-    st.header("5. Number of Admissions Per Month")
+    st.header("5. Patient Age Distribution")
+
+    if "Age" in filtered_df.columns:
+        fig, ax = plt.subplots(figsize=(12, 5))
+
+        ax.hist(
+            filtered_df["Age"].dropna(),
+            bins=20,
+            edgecolor="black"
+        )
+
+        ax.set_title("Patient Age Distribution")
+        ax.set_xlabel("Age")
+        ax.set_ylabel("Number of Patients")
+
+        plt.tight_layout()
+        st.pyplot(fig)
+    else:
+        st.warning("Age column not found.")
+
+    st.header("6. Number of Admissions Per Month")
 
     monthly_admissions = filtered_analyzer.admissions_per_month()
 
@@ -214,7 +229,7 @@ if uploaded_file is not None:
     else:
         st.warning("No valid date column was found for monthly admissions.")
 
-    st.header("6. Patient Outcomes Distribution by Age")
+    st.header("7. Patient Outcomes Distribution by Age")
 
     if "Outcome" in filtered_df.columns and "Age" in filtered_df.columns:
         fig, ax = plt.subplots(figsize=(10, 5))
@@ -231,7 +246,7 @@ if uploaded_file is not None:
     else:
         st.warning("Outcome and Age columns are required for this chart.")
 
-    st.header("7. Most Common Diseases or Conditions")
+    st.header("8. Most Common Diseases or Conditions")
 
     diseases = filtered_analyzer.disease_counts()
 
@@ -246,7 +261,7 @@ if uploaded_file is not None:
     else:
         st.warning("Disease column not found.")
 
-    st.header("8. Average Length of Stay by Department")
+    st.header("9. Average Length of Stay by Department")
 
     los = filtered_analyzer.length_of_stay_by_department()
 
@@ -262,7 +277,7 @@ if uploaded_file is not None:
     else:
         st.warning("Department and Length_of_Stay columns are required.")
 
-    st.header("9. Average Service Satisfaction by Department")
+    st.header("10. Average Service Satisfaction by Department")
 
     satisfaction = filtered_analyzer.satisfaction_by_department()
 
@@ -278,7 +293,7 @@ if uploaded_file is not None:
     else:
         st.warning("Department and Satisfaction columns are required.")
 
-    st.header("10. Key Findings and Actionable Insights")
+    st.header("11. Key Findings and Actionable Insights")
 
     most_common_disease = (
         filtered_df["Disease"].mode()[0]
@@ -288,6 +303,7 @@ if uploaded_file is not None:
 
     st.markdown(f"""
     - The dataset contains **{len(filtered_df):,} patient records** after applying selected filters.
+    - The average patient age is **{round(filtered_df['Age'].mean(), 2) if 'Age' in filtered_df.columns else 'N/A'}**.
     - The most common disease or condition in the filtered data is **{most_common_disease}**.
     - Monthly admissions trends can help hospital administrators plan staffing and resource allocation.
     - Length-of-stay analysis can help identify departments where operational efficiency may be improved.
