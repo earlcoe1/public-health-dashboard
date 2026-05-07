@@ -97,6 +97,14 @@ if uploaded_file is not None:
 
         # Extra polish: sort monthly admissions by month-year
         monthly_admissions = monthly_admissions.sort_values("Month-Year")
+        monthly_admissions = monthly_admissions.sort_values("Month-Year")
+
+if len(monthly_admissions) > 1:
+    last_value = monthly_admissions["Number of Admissions"].iloc[-1]
+    avg_previous = monthly_admissions["Number of Admissions"].iloc[:-1].mean()
+
+    if last_value < avg_previous * 0.5:
+        monthly_admissions = monthly_admissions.iloc[:-1]
 
         st.dataframe(
             monthly_admissions.style.format({
