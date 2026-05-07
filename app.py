@@ -2,10 +2,17 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# -------------------------------
+# Page Setup
+# -------------------------------
 st.set_page_config(page_title="Healthcare Analytics Dashboard", layout="wide")
 
 st.title("🏥 Healthcare Patient Analytics Dashboard")
+st.markdown("Upload your cleaned healthcare dataset for analysis and visualization.")
 
+# -------------------------------
+# File Upload
+# -------------------------------
 uploaded_file = st.file_uploader(
     "Upload your healthcare dataset (CSV or Excel)",
     type=["csv", "xlsx"]
@@ -13,6 +20,7 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
+    # Load file
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
@@ -20,78 +28,124 @@ if uploaded_file is not None:
 
     st.success("Dataset uploaded successfully!")
 
-    # Remove extra spaces from column names
+    # Clean column names
     df.columns = df.columns.str.strip()
 
+    # Display columns
     st.subheader("Available Columns in Your Dataset")
     st.write(list(df.columns))
 
-    # Helper function to find matching column names
-    def find_column(possible_names):
-        for name in possible_names:
-            if name in df.columns:
-                return name
-        return None
+    # -------------------------------
+    # Handle existing cleaned dataset
+    # -------------------------------
 
-    admission_col = find_column([
-        "Date of Admission",
-        "Admission Date",
-        "Admission_Date",
-        "admission_date"
-    ])
+    # Admission Date
+    if "Admission_Date" in df.columns:
+        df["Admission_Date"] = pd.to_datetime(df["Admission_Date"], errors="coerce")
 
-    discharge_col = find_column([
-        "Discharge Date",
-        "Discharge_Date",
-        "discharge_date"
-    ])
+    # If Year + Month exist, reconstruct date
+    elif "Year" in df.columns and "Month" in df.columns:
+        df["Admission_Date"] = pd.to_datetime(
+            df["Year"].astype(str) + "-" + df["Month"].astype(str) + "-01",
+            errors="coerce"
+        )
 
-    disease_col = find_column([
-        "Medical Condition",
-        "Disease",
-        "Condition"
-    ])
-
-    if admission_col is None or discharge_col is None:
-        st.error("Admission or Discharge date column was not found. Check the column names shown above.")
+    else:
+        st.error("Admission date information not found.")
         st.stop()
 
-    df["Admission_Date"] = pd.to_datetime(df[admission_col], errors="coerce")
-    df["Discharge_Date"] = pd.to_datetime(df[discharge_col], errors="coerce")
+    # Length of Stay
+    if "Length_of_Stay" in df.columns:
+        df["Length of Stay (Days)"] = pd.to_numeric(
+            df["Length_of_Stay"], errors="coerce"
+        )
 
-    df["Length of Stay (Days)"] = (
-        df["Discharge_Date"] - df["Admission_Date"]
-    ).dt.days
+    elif "Length of Stay (Days)" in df.columns:
+        df["Length of Stay (Days)"] = pd.to_numeric(
+            df["Length of Stay (Days)"], errors="coerce"
+        )
 
+    else:
+        df["Length of Stay (Days)"] = 0
+
+    # Satisfaction
+    if "Satisfaction" in df.columns:
+        df["Patient Satisfaction Score"] = pd.to_numeric(
+            df["Satisfaction"], errors="coerce"
+        )
+
+    elif "Patient Satisfaction Score" in df.columns:
+        df["Patient Satisfaction Score"] = pd.to_numeric(
+            df["Patient Satisfaction Score"], errors="coerce"
+        )
+
+    else:
+        df["Patient Satisfaction Score"] = 3
+
+    # Fill missing values
     df["Length of Stay (Days)"] = df["Length of Stay (Days)"].fillna(
         df["Length of Stay (Days)"].median()
     )
 
-    if disease_col:
-        df["Disease"] = df[disease_col]
-    else:
-        df["Disease"] = "Unknown"
-
-    if "Billing Amount" in df.columns:
-        df["Patient Satisfaction Score"] = (
-            df["Billing Amount"].rank(pct=True) * 5
-        ).round().clip(1, 5)
-    else:
-        df["Patient Satisfaction Score"] = 3
-
-    st.subheader("Dataset Preview - Head")
-    st.dataframe(df.head())
-
-    st.subheader("Dataset Preview - Tail")
-    st.dataframe(df.tail())
-
-    st.subheader("Numeric Summary")
-    st.dataframe(
-        df[["Age", "Length of Stay (Days)", "Patient Satisfaction Score"]]
-        .describe()
+    df["Patient Satisfaction Score"] = df["Patient Satisfaction Score"].fillna(
+        df["Patient Satisfaction Score"].median()
     )
 
-    st.subheader("Monthly Admissions Trends")
+    # -------------------------------
+    # Dataset Preview
+    # -------------------------------
+    st.subheader("📄 Dataset Preview - Head")
+    st.dataframe(df.head())
+
+    st.subheader("📄 Dataset Preview - Tail")
+    st.dataframe(df.tail())
+
+    # -------------------------------
+    # Numeric Summary
+    # -------------------------------
+    st.subheader("📊 Numeric Summary")
+
+    numeric_cols = []
+
+    if "Age" in df.columns:
+        numeric_cols.append("Age")
+
+    numeric_cols.extend([
+        "Length of Stay (Days)",
+        "Patient Satisfaction Score"
+    ])
+
+    st.dataframe(df[numeric_cols].describe())
+
+    # -------------------------------
+    # Categorical Summary
+    # -------------------------------
+    st.subheader("📋 Categorical Summary")
+
+    categorical_candidates = [
+        "Disease",
+        "Outcome",
+        "Department",
+        "Gender",
+        "Patient_Type"
+    ]
+
+    cat_summary = []
+
+    for col in categorical_candidates:
+        if col in df.columns:
+            cat_summary.append({
+                "Column": col,
+                "Unique Values": df[col].nunique(),
+                "Most Common Value": df[col].mode()[0]
+            })
+
+    st.dataframe(pd.DataFrame(cat_summary))
+
+    # -------------------------------
+    # Monthly Admissions Trends
+    # -------------------------------
+    st.subheader("📅 Monthly Admissions Trends")
 
     df["Admission_Month"] = df["Admission_Date"].dt.to_period("M").astype(str)
     monthly_admissions = df.groupby("Admission_Month").size()
@@ -104,14 +158,38 @@ if uploaded_file is not None:
     plt.xticks(rotation=45)
     st.pyplot(fig1)
 
-    st.subheader("Disease Distribution")
+    # -------------------------------
+    # Disease Distribution
+    # -------------------------------
+    if "Disease" in df.columns:
+        st.subheader("🦠 Disease Distribution")
 
-    fig2, ax2 = plt.subplots(figsize=(10, 5))
-    df["Disease"].value_counts().plot(kind="bar", ax=ax2)
-    ax2.set_title("Disease Distribution")
-    ax2.set_xlabel("Disease")
-    ax2.set_ylabel("Patient Count")
-    plt.xticks(rotation=45)
-    st.pyplot(fig2)
+        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        df["Disease"].value_counts().plot(kind="bar", ax=ax2)
+        ax2.set_title("Disease Distribution")
+        ax2.set_xlabel("Disease")
+        ax2.set_ylabel("Patient Count")
+        plt.xticks(rotation=45)
+        st.pyplot(fig2)
 
-    st.success("Dashboard completed successfully!")
+    # -------------------------------
+    # Department Comparison
+    # -------------------------------
+    if "Department" in df.columns:
+        st.subheader("🏨 Department Comparison")
+
+        fig3, ax3 = plt.subplots(figsize=(10, 5))
+        df["Department"].value_counts().plot(kind="bar", ax=ax3)
+        ax3.set_title("Patients by Department")
+        ax3.set_xlabel("Department")
+        ax3.set_ylabel("Patient Count")
+        plt.xticks(rotation=45)
+        st.pyplot(fig3)
+
+    # -------------------------------
+    # Final Dataset Shape
+    # -------------------------------
+    st.subheader("📌 Final Dataset Shape")
+    st.write(df.shape)
+
+    st.success("Dashboard analysis completed successfully!")
