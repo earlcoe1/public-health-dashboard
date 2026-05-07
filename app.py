@@ -2,208 +2,232 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# -------------------------------
-# Page Setup
-# -------------------------------
-st.set_page_config(page_title="Healthcare Analytics Dashboard", layout="wide")
+st.set_page_config(
+    page_title="Hospital & Public Health Insights Dashboard",
+    page_icon="🏥",
+    layout="wide"
+)
 
-st.title("🏥 Healthcare Patient Analytics Dashboard")
-st.markdown("Upload your cleaned healthcare dataset for analysis and visualization.")
 
-# -------------------------------
-# File Upload
-# -------------------------------
+class HealthAnalyzer:
+    def __init__(self, df):
+        self.df = df.copy()
+
+    def clean_data(self):
+        self.df = self.df.drop_duplicates()
+
+        self.df["Admission_Date"] = pd.to_datetime(
+            self.df["Admission_Date"], errors="coerce"
+        )
+
+        self.df["Year"] = self.df["Admission_Date"].dt.year
+        self.df["Month"] = self.df["Admission_Date"].dt.month
+
+        for col in ["Age", "Length_of_Stay", "Satisfaction"]:
+            self.df[col] = pd.to_numeric(self.df[col], errors="coerce")
+
+        self.df["Outcome"] = self.df["Outcome"].replace({
+            "Discharge": "Discharged",
+            "Discharged": "Discharged",
+            "DAMA": "DAMA",
+            "Death": "Death",
+            "Died": "Death"
+        })
+
+        required_cols = [
+            "Admission_Date", "Disease", "Outcome", "Department",
+            "Age", "Gender", "Length_of_Stay", "Satisfaction", "Patient_Type"
+        ]
+
+        self.df = self.df.dropna(subset=required_cols)
+        self.df = self.df[self.df["Length_of_Stay"] >= 0]
+
+        return self.df
+
+    def admissions_over_time(self, df):
+        return df.groupby(["Year", "Month"]).size().reset_index(name="Admissions")
+
+    def disease_counts(self, df):
+        return df["Disease"].value_counts().head(10)
+
+    def length_of_stay_by_department(self, df):
+        return df.groupby("Department")["Length_of_Stay"].mean().sort_values(ascending=False)
+
+    def satisfaction_by_department(self, df):
+        return df.groupby("Department")["Satisfaction"].mean().sort_values(ascending=False)
+
+    def outcome_summary(self, df):
+        return df["Outcome"].value_counts()
+
+
+st.markdown(
+    """
+    <h1 style='text-align:center;'>🏥 Hospital & Public Health Insights Dashboard</h1>
+    <p style='text-align:center; font-size:18px;'>
+    Operational, population health, equity, quality, and policy insights for healthcare decision-making.
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+
 uploaded_file = st.file_uploader(
-    "Upload your healthcare dataset (CSV or Excel)",
+    "Upload cleaned public health dataset",
     type=["csv", "xlsx"]
 )
 
-if uploaded_file is not None:
+if uploaded_file:
+    raw_df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
 
-    # -------------------------------
-    # Load Data
-    # -------------------------------
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
+    analyzer = HealthAnalyzer(raw_df)
+    df = analyzer.clean_data()
 
-    st.success("Dataset uploaded successfully!")
-
-    # Clean column names
-    df.columns = df.columns.str.strip()
-
-    # Display columns
-    st.subheader("Available Columns in Your Dataset")
-    st.write(list(df.columns))
-
-    # -------------------------------
-    # Handle Dates
-    # -------------------------------
-    if "Admission_Date" in df.columns:
-        df["Admission_Date"] = pd.to_datetime(df["Admission_Date"], errors="coerce")
-
-    elif "Year" in df.columns and "Month" in df.columns:
-        df["Admission_Date"] = pd.to_datetime(
-            df["Year"].astype(str) + "-" + df["Month"].astype(str) + "-01",
-            errors="coerce"
-        )
-
-    else:
-        st.error("Admission date information not found.")
+    if df.empty:
+        st.error("The uploaded dataset has no usable records after cleaning.")
         st.stop()
 
-    # -------------------------------
-    # Length of Stay
-    # -------------------------------
-    if "Length_of_Stay" in df.columns:
-        df["Length of Stay (Days)"] = pd.to_numeric(
-            df["Length_of_Stay"], errors="coerce"
-        )
+    st.success("Dataset uploaded and cleaned successfully.")
 
-    elif "Length of Stay (Days)" in df.columns:
-        df["Length of Stay (Days)"] = pd.to_numeric(
-            df["Length of Stay (Days)"], errors="coerce"
-        )
+    st.subheader("Dataset Preview")
+    st.dataframe(df.head(10), use_container_width=True)
 
-    else:
-        df["Length of Stay (Days)"] = 0
+    st.subheader("Dataset Summary")
 
-    # -------------------------------
-    # Satisfaction Score
-    # -------------------------------
-    if "Satisfaction" in df.columns:
-        df["Patient Satisfaction Score"] = pd.to_numeric(
-            df["Satisfaction"], errors="coerce"
-        )
+    s1, s2, s3, s4 = st.columns(4)
+    s1.metric("Total Records", len(df))
+    s2.metric("Diseases", df["Disease"].nunique())
+    s3.metric("Departments", df["Department"].nunique())
+    s4.metric("Date Range", f"{int(df['Year'].min())} - {int(df['Year'].max())}")
 
-    elif "Patient Satisfaction Score" in df.columns:
-        df["Patient Satisfaction Score"] = pd.to_numeric(
-            df["Patient Satisfaction Score"], errors="coerce"
-        )
+    st.markdown("### Numeric Summary")
+    st.dataframe(df[["Age", "Length_of_Stay", "Satisfaction"]].describe(), use_container_width=True)
 
-    else:
-        df["Patient Satisfaction Score"] = 3
+    st.markdown("### Categorical Summary")
+    categorical_summary = pd.DataFrame({
+        "Column": ["Disease", "Outcome", "Department", "Gender", "Patient_Type"],
+        "Unique Values": [
+            df["Disease"].nunique(),
+            df["Outcome"].nunique(),
+            df["Department"].nunique(),
+            df["Gender"].nunique(),
+            df["Patient_Type"].nunique()
+        ],
+        "Most Common Value": [
+            df["Disease"].mode()[0],
+            df["Outcome"].mode()[0],
+            df["Department"].mode()[0],
+            df["Gender"].mode()[0],
+            df["Patient_Type"].mode()[0]
+        ]
+    })
+    st.dataframe(categorical_summary, use_container_width=True)
 
-    # Fill missing values
-    df["Length of Stay (Days)"] = df["Length of Stay (Days)"].fillna(
-        df["Length of Stay (Days)"].median()
+    st.sidebar.header("Interactive Filters")
+
+    gender_filter = st.sidebar.selectbox("Gender", ["All"] + sorted(df["Gender"].dropna().unique().tolist()))
+    department_filter = st.sidebar.selectbox("Department", ["All"] + sorted(df["Department"].dropna().unique().tolist()))
+    disease_filter = st.sidebar.selectbox("Disease", ["All"] + sorted(df["Disease"].dropna().unique().tolist()))
+    outcome_filter = st.sidebar.selectbox("Outcome", ["All"] + sorted(df["Outcome"].dropna().unique().tolist()))
+
+    min_age = int(df["Age"].min())
+    max_age = int(df["Age"].max())
+
+    age_filter = (min_age, max_age) if min_age == max_age else st.sidebar.slider(
+        "Age Range", min_value=min_age, max_value=max_age, value=(min_age, max_age)
     )
 
-    df["Patient Satisfaction Score"] = df["Patient Satisfaction Score"].fillna(
-        df["Patient Satisfaction Score"].median()
-    )
+    filtered_df = df.copy()
 
-    # -------------------------------
-    # Build Numeric Summary
-    # -------------------------------
-    numeric_cols = []
+    if gender_filter != "All":
+        filtered_df = filtered_df[filtered_df["Gender"] == gender_filter]
+    if department_filter != "All":
+        filtered_df = filtered_df[filtered_df["Department"] == department_filter]
+    if disease_filter != "All":
+        filtered_df = filtered_df[filtered_df["Disease"] == disease_filter]
+    if outcome_filter != "All":
+        filtered_df = filtered_df[filtered_df["Outcome"] == outcome_filter]
 
-    if "Age" in df.columns:
-        numeric_cols.append("Age")
-
-    numeric_cols.extend([
-        "Length of Stay (Days)",
-        "Patient Satisfaction Score"
-    ])
-
-    # -------------------------------
-    # Build Categorical Summary
-    # -------------------------------
-    categorical_candidates = [
-        "Disease",
-        "Outcome",
-        "Department",
-        "Gender",
-        "Patient_Type"
+    filtered_df = filtered_df[
+        (filtered_df["Age"] >= age_filter[0]) &
+        (filtered_df["Age"] <= age_filter[1])
     ]
 
-    cat_summary = []
+    if filtered_df.empty:
+        st.warning("No records match the selected filters.")
+        st.stop()
 
-    for col in categorical_candidates:
-        if col in df.columns:
-            cat_summary.append({
-                "Column": col,
-                "Unique Values": df[col].nunique(),
-                "Most Common Value": df[col].mode()[0]
-            })
+    st.subheader("Executive KPI Summary")
 
-    # -------------------------------
-    # Prepare Charts
-    # -------------------------------
-    df["Admission_Month"] = df["Admission_Date"].dt.to_period("M").astype(str)
-    monthly_admissions = df.groupby("Admission_Month").size()
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Records", len(filtered_df))
+    col2.metric("Avg. Length of Stay", round(filtered_df["Length_of_Stay"].mean(), 2))
+    col3.metric("Avg. Satisfaction", round(filtered_df["Satisfaction"].mean(), 2))
+    col4.metric("Active Diseases", filtered_df["Disease"].nunique())
 
-    fig1, ax1 = plt.subplots(figsize=(12, 5))
-    monthly_admissions.plot(kind="line", marker="o", ax=ax1)
-    ax1.set_title("Monthly Patient Admissions")
-    ax1.set_xlabel("Month")
-    ax1.set_ylabel("Number of Admissions")
+    st.header("1. Patient Outcomes Distribution by Age")
+
+    fig, ax = plt.subplots()
+    for outcome in ["Discharged", "DAMA", "Death"]:
+        subset = filtered_df[filtered_df["Outcome"] == outcome]
+        if not subset.empty:
+            ax.hist(subset["Age"], alpha=0.5, label=outcome)
+
+    ax.set_xlabel("Age")
+    ax.set_ylabel("Count")
+    ax.legend()
+    st.pyplot(fig)
+
+    st.header("2. Admissions Over Time")
+
+    admissions = analyzer.admissions_over_time(filtered_df)
+    admissions["Date"] = pd.to_datetime(
+        admissions["Year"].astype(str) + "-" + admissions["Month"].astype(str) + "-01"
+    )
+
+    fig, ax = plt.subplots()
+    ax.plot(admissions["Date"], admissions["Admissions"], marker="o")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Admissions")
     plt.xticks(rotation=45)
+    st.pyplot(fig)
 
-    if "Disease" in df.columns:
-        fig2, ax2 = plt.subplots(figsize=(10, 5))
-        df["Disease"].value_counts().plot(kind="bar", ax=ax2)
-        ax2.set_title("Disease Distribution")
-        ax2.set_xlabel("Disease")
-        ax2.set_ylabel("Patient Count")
-        plt.xticks(rotation=45)
+    st.header("3. Most Common Diseases or Conditions")
 
-    if "Department" in df.columns:
-        fig3, ax3 = plt.subplots(figsize=(10, 5))
-        df["Department"].value_counts().plot(kind="bar", ax=ax3)
-        ax3.set_title("Patients by Department")
-        ax3.set_xlabel("Department")
-        ax3.set_ylabel("Patient Count")
-        plt.xticks(rotation=45)
+    disease_counts = analyzer.disease_counts(filtered_df)
 
-    # -------------------------------
-    # PLACEHOLDERS
-    # -------------------------------
-    head_placeholder = st.empty()
-    tail_placeholder = st.empty()
-    numeric_placeholder = st.empty()
-    categorical_placeholder = st.empty()
-    monthly_placeholder = st.empty()
-    disease_placeholder = st.empty()
-    department_placeholder = st.empty()
-    shape_placeholder = st.empty()
+    fig, ax = plt.subplots()
+    disease_counts.plot(kind="barh", ax=ax)
+    ax.invert_yaxis()
+    ax.set_xlabel("Frequency")
+    st.pyplot(fig)
 
-    # -------------------------------
-    # DISPLAY CONTENT
-    # -------------------------------
-    with head_placeholder.container():
-        st.subheader("📄 Dataset Preview - Head")
-        st.dataframe(df.head())
+    st.header("4. Average Length of Stay by Department")
 
-    with tail_placeholder.container():
-        st.subheader("📄 Dataset Preview - Tail")
-        st.dataframe(df.tail())
+    los = analyzer.length_of_stay_by_department(filtered_df)
 
-    with numeric_placeholder.container():
-        st.subheader("📊 Numeric Summary")
-        st.dataframe(df[numeric_cols].describe())
+    fig, ax = plt.subplots()
+    los.plot(kind="bar", ax=ax)
+    ax.set_ylabel("Days")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
 
-    with categorical_placeholder.container():
-        st.subheader("📋 Categorical Summary")
-        st.dataframe(pd.DataFrame(cat_summary))
+    st.header("5. Average Service Satisfaction by Department")
 
-    with monthly_placeholder.container():
-        st.subheader("📅 Monthly Admissions Trends")
-        st.pyplot(fig1)
+    satisfaction = analyzer.satisfaction_by_department(filtered_df)
 
-    if "Disease" in df.columns:
-        with disease_placeholder.container():
-            st.subheader("🦠 Disease Distribution")
-            st.pyplot(fig2)
+    fig, ax = plt.subplots()
+    satisfaction.plot(kind="bar", ax=ax)
+    ax.set_ylabel("Rating")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
 
-    if "Department" in df.columns:
-        with department_placeholder.container():
-            st.subheader("🏨 Department Comparison")
-            st.pyplot(fig3)
+    st.subheader("Policy Recommendations")
 
-    with shape_placeholder.container():
-        st.subheader("📌 Final Dataset Shape")
-        st.write(df.shape)
+    st.markdown(f"""
+    - Focus preventive resources on **{filtered_df['Disease'].mode()[0]}**
+    - Improve patient experience in low-satisfaction departments
+    - Optimize staffing for high-admission periods
+    - Reduce long stays in departments with operational inefficiencies
+    """)
 
-    st.success("Dashboard analysis completed successfully!")
+else:
+    st.info("Upload `clean_public_health_data.csv` to begin dashboard analysis.")
