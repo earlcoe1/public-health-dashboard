@@ -20,7 +20,9 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
-    # Load file
+    # -------------------------------
+    # Load Data
+    # -------------------------------
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
@@ -36,14 +38,11 @@ if uploaded_file is not None:
     st.write(list(df.columns))
 
     # -------------------------------
-    # Handle existing cleaned dataset
+    # Handle Dates
     # -------------------------------
-
-    # Admission Date
     if "Admission_Date" in df.columns:
         df["Admission_Date"] = pd.to_datetime(df["Admission_Date"], errors="coerce")
 
-    # If Year + Month exist, reconstruct date
     elif "Year" in df.columns and "Month" in df.columns:
         df["Admission_Date"] = pd.to_datetime(
             df["Year"].astype(str) + "-" + df["Month"].astype(str) + "-01",
@@ -54,7 +53,9 @@ if uploaded_file is not None:
         st.error("Admission date information not found.")
         st.stop()
 
+    # -------------------------------
     # Length of Stay
+    # -------------------------------
     if "Length_of_Stay" in df.columns:
         df["Length of Stay (Days)"] = pd.to_numeric(
             df["Length_of_Stay"], errors="coerce"
@@ -68,7 +69,9 @@ if uploaded_file is not None:
     else:
         df["Length of Stay (Days)"] = 0
 
-    # Satisfaction
+    # -------------------------------
+    # Satisfaction Score
+    # -------------------------------
     if "Satisfaction" in df.columns:
         df["Patient Satisfaction Score"] = pd.to_numeric(
             df["Satisfaction"], errors="coerce"
@@ -92,19 +95,8 @@ if uploaded_file is not None:
     )
 
     # -------------------------------
-    # Dataset Preview
+    # Build Numeric Summary
     # -------------------------------
-    st.subheader("📄 Dataset Preview - Head")
-    st.dataframe(df.head())
-
-    st.subheader("📄 Dataset Preview - Tail")
-    st.dataframe(df.tail())
-
-    # -------------------------------
-    # Numeric Summary
-    # -------------------------------
-    st.subheader("📊 Numeric Summary")
-
     numeric_cols = []
 
     if "Age" in df.columns:
@@ -115,13 +107,9 @@ if uploaded_file is not None:
         "Patient Satisfaction Score"
     ])
 
-    st.dataframe(df[numeric_cols].describe())
-
     # -------------------------------
-    # Categorical Summary
+    # Build Categorical Summary
     # -------------------------------
-    st.subheader("📋 Categorical Summary")
-
     categorical_candidates = [
         "Disease",
         "Outcome",
@@ -140,13 +128,9 @@ if uploaded_file is not None:
                 "Most Common Value": df[col].mode()[0]
             })
 
-    st.dataframe(pd.DataFrame(cat_summary))
-
     # -------------------------------
-    # Monthly Admissions Trends
+    # Prepare Charts
     # -------------------------------
-    st.subheader("📅 Monthly Admissions Trends")
-
     df["Admission_Month"] = df["Admission_Date"].dt.to_period("M").astype(str)
     monthly_admissions = df.groupby("Admission_Month").size()
 
@@ -156,40 +140,70 @@ if uploaded_file is not None:
     ax1.set_xlabel("Month")
     ax1.set_ylabel("Number of Admissions")
     plt.xticks(rotation=45)
-    st.pyplot(fig1)
 
-    # -------------------------------
-    # Disease Distribution
-    # -------------------------------
     if "Disease" in df.columns:
-        st.subheader("🦠 Disease Distribution")
-
         fig2, ax2 = plt.subplots(figsize=(10, 5))
         df["Disease"].value_counts().plot(kind="bar", ax=ax2)
         ax2.set_title("Disease Distribution")
         ax2.set_xlabel("Disease")
         ax2.set_ylabel("Patient Count")
         plt.xticks(rotation=45)
-        st.pyplot(fig2)
 
-    # -------------------------------
-    # Department Comparison
-    # -------------------------------
     if "Department" in df.columns:
-        st.subheader("🏨 Department Comparison")
-
         fig3, ax3 = plt.subplots(figsize=(10, 5))
         df["Department"].value_counts().plot(kind="bar", ax=ax3)
         ax3.set_title("Patients by Department")
         ax3.set_xlabel("Department")
         ax3.set_ylabel("Patient Count")
         plt.xticks(rotation=45)
-        st.pyplot(fig3)
 
     # -------------------------------
-    # Final Dataset Shape
+    # PLACEHOLDERS
     # -------------------------------
-    st.subheader("📌 Final Dataset Shape")
-    st.write(df.shape)
+    head_placeholder = st.empty()
+    tail_placeholder = st.empty()
+    numeric_placeholder = st.empty()
+    categorical_placeholder = st.empty()
+    monthly_placeholder = st.empty()
+    disease_placeholder = st.empty()
+    department_placeholder = st.empty()
+    shape_placeholder = st.empty()
+
+    # -------------------------------
+    # DISPLAY CONTENT
+    # -------------------------------
+    with head_placeholder.container():
+        st.subheader("📄 Dataset Preview - Head")
+        st.dataframe(df.head())
+
+    with tail_placeholder.container():
+        st.subheader("📄 Dataset Preview - Tail")
+        st.dataframe(df.tail())
+
+    with numeric_placeholder.container():
+        st.subheader("📊 Numeric Summary")
+        st.dataframe(df[numeric_cols].describe())
+
+    with categorical_placeholder.container():
+        st.subheader("📋 Categorical Summary")
+        st.dataframe(pd.DataFrame(cat_summary))
+
+    with monthly_placeholder.container():
+        st.subheader("📅 Monthly Admissions Trends")
+        st.pyplot(fig1)
+
+    if "Disease" in df.columns:
+        with disease_placeholder.container():
+            st.subheader("🦠 Disease Distribution")
+            st.pyplot(fig2)
+
+    if "Department" in df.columns:
+        with department_placeholder.container():
+            st.subheader("🏨 Department Comparison")
+            st.pyplot(fig3)
+
+    with shape_placeholder.container():
+        st.subheader("📌 Final Dataset Shape")
+        st.write(df.shape)
 
     st.success("Dashboard analysis completed successfully!")
