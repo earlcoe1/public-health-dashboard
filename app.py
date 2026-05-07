@@ -51,7 +51,7 @@ if uploaded_file is not None:
 
     if available_summary_columns:
         st.dataframe(
-            df[available_summary_columns].describe(),
+            df[available_summary_columns].describe().round(2),
             use_container_width=True
         )
     else:
@@ -95,8 +95,13 @@ if uploaded_file is not None:
             columns={date_column: "Month-Year"}
         )
 
+        # Extra polish: sort monthly admissions by month-year
+        monthly_admissions = monthly_admissions.sort_values("Month-Year")
+
         st.dataframe(
-            monthly_admissions,
+            monthly_admissions.style.format({
+                "Number of Admissions": "{:,}"
+            }),
             use_container_width=True,
             hide_index=True
         )
@@ -104,17 +109,19 @@ if uploaded_file is not None:
         # 5. Visualize monthly admissions
         st.header("5. Monthly Admissions Visualization")
 
-        fig, ax = plt.subplots(figsize=(12, 5))
+        fig, ax = plt.subplots(figsize=(14, 6))
 
         ax.bar(
             monthly_admissions["Month-Year"],
             monthly_admissions["Number of Admissions"]
         )
 
-        ax.set_title("Monthly Patient Admissions")
+        ax.set_title("Monthly Patient Admissions Trends", fontsize=14)
         ax.set_xlabel("Month-Year")
         ax.set_ylabel("Number of Admissions")
-        plt.xticks(rotation=45)
+
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
 
         st.pyplot(fig)
 
