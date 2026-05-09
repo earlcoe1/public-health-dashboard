@@ -328,7 +328,7 @@ with tab3:
 # REQUIRED CHART 1
 # ============================================================
 
-st.header("Required Chart 1: Histogram — Patient Outcomes by Age")
+st.header(": Histogram — Patient Outcomes by Age")
 
 fig1, ax1 = plt.subplots(figsize=(10, 5))
 
@@ -347,7 +347,7 @@ st.pyplot(fig1)
 # REQUIRED CHART 2
 # ============================================================
 
-st.header("Required Chart 2: Line Chart — Admissions Over Time")
+st.header(": Line Chart — Admissions Over Time")
 
 admissions = filtered_analyzer.admissions_over_time()
 
@@ -365,7 +365,7 @@ st.pyplot(fig2)
 # REQUIRED CHART 3
 # ============================================================
 
-st.header("Required Chart 3: Bar Chart — Average Service Satisfaction by Department")
+st.header(": Bar Chart — Average Service Satisfaction by Department")
 
 satisfaction = filtered_analyzer.satisfaction_by_department()
 
