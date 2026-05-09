@@ -284,22 +284,6 @@ filtered_analyzer = HealthAnalyzer(filtered_df)
 filtered_analyzer.df = filtered_df
 
 # ============================================================
-# SHOW REQUIRED CLASS METHODS ON DASHBOARD
-# ============================================================
-
-st.header("Required HealthAnalyzer Class Methods Applied")
-
-st.markdown("""
-The dashboard applies the required class methods:
-
-1. `clean_patient_records()` — cleans patient records  
-2. `summarize_outcomes()` — summarizes Discharged, DAMA, and Death outcomes  
-3. `aggregate_by_age()` — aggregates patient outcomes by age group  
-4. `aggregate_by_gender()` — aggregates patient outcomes by gender  
-5. `aggregate_by_department()` — aggregates records by department  
-""")
-
-# ============================================================
 # KPI SUMMARY
 # ============================================================
 
