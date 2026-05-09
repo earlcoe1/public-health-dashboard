@@ -365,7 +365,7 @@ st.pyplot(fig1)
 # REQUIRED CHART 2
 # ============================================================
 
-st.header("Required Chart 2: Line Chart — Admissions Over Time")
+st.header("Admissions Over Time")
 
 admissions = filtered_analyzer.admissions_over_time()
 
