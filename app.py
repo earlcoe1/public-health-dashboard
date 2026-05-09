@@ -322,7 +322,7 @@ st.dataframe(outcome_summary, use_container_width=True)
 # AGGREGATION TABLES
 # ============================================================
 
-st.header("3. Aggregating Data by Age, Gender, and Department")
+st.header("Aggregated Data by Age, Gender, and Department")
 
 tab1, tab2, tab3 = st.tabs([
     "By Age",
