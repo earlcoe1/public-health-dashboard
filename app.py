@@ -210,36 +210,56 @@ if df.empty:
 
 st.success("Dataset loaded and cleaned successfully.")
 
+
 # ============================================================
-# FILTERS
+# INTERACTIVE SIDEBAR FILTERS
 # ============================================================
 
 st.sidebar.header("Interactive Filters")
 
-age_filter = st.sidebar.slider(
-    "Filter by Age",
-    int(df["Age"].min()),
-    int(df["Age"].max()),
-    (int(df["Age"].min()), int(df["Age"].max()))
-)
+gender_options = ["All"] + sorted(df["Gender"].dropna().unique().tolist())
+department_options = ["All"] + sorted(df["Department"].dropna().unique().tolist())
+outcome_options = ["All"] + sorted(df["Outcome"].dropna().unique().tolist())
 
-gender_filter = st.sidebar.multiselect(
+selected_gender = st.sidebar.selectbox(
     "Filter by Gender",
-    sorted(df["Gender"].unique()),
-    default=sorted(df["Gender"].unique())
+    gender_options
 )
 
-department_filter = st.sidebar.multiselect(
+selected_department = st.sidebar.selectbox(
     "Filter by Department",
-    sorted(df["Department"].unique()),
-    default=sorted(df["Department"].unique())
+    department_options
 )
 
-filtered_df = df[
-    (df["Age"] >= age_filter[0]) &
-    (df["Age"] <= age_filter[1]) &
-    (df["Gender"].isin(gender_filter)) &
-    (df["Department"].isin(department_filter))
+selected_outcome = st.sidebar.selectbox(
+    "Filter by Outcome",
+    outcome_options
+)
+
+min_age = int(df["Age"].min())
+max_age = int(df["Age"].max())
+
+selected_age = st.sidebar.slider(
+    "Filter by Age",
+    min_value=min_age,
+    max_value=max_age,
+    value=(min_age, max_age)
+)
+
+filtered_df = df.copy()
+
+if selected_gender != "All":
+    filtered_df = filtered_df[filtered_df["Gender"] == selected_gender]
+
+if selected_department != "All":
+    filtered_df = filtered_df[filtered_df["Department"] == selected_department]
+
+if selected_outcome != "All":
+    filtered_df = filtered_df[filtered_df["Outcome"] == selected_outcome]
+
+filtered_df = filtered_df[
+    (filtered_df["Age"] >= selected_age[0]) &
+    (filtered_df["Age"] <= selected_age[1])
 ]
 
 if filtered_df.empty:
