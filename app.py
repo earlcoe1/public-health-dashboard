@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 st.set_page_config(
-    page_title="Project 6: Public Health Dashboard",
+    page_title="AMTH Public Health Dashboard",
     page_icon="🏥",
     layout="wide"
 )
@@ -193,7 +193,7 @@ class HealthAnalyzer:
 # DASHBOARD
 # ============================================================
 
-st.title("🏥 Project 6: Public Health Patient & Hospital Data Dashboard")
+st.title("🏥 AMTH Public Health Patient & Hospital Data Dashboard")
 
 st.markdown("""
 This dashboard meets the Project 6 requirements by using a `HealthAnalyzer` class to clean patient records,
