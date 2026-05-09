@@ -300,7 +300,7 @@ c4.metric("Avg. Satisfaction", round(filtered_df["Satisfaction"].mean(), 2))
 # DATA CLEANING
 # ============================================================
 
-st.header("1. Cleaning Patient Records")
+st.header("Patient Records")
 
 st.markdown("""
 The dataset was cleaned by removing duplicates, formatting admission dates, handling missing numeric and categorical data,
