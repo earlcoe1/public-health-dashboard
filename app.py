@@ -117,7 +117,7 @@ class HealthAnalyzer:
 
         return self.df
 
-    # 2. Summarizing outcomes: Discharged, DAMA, Death
+    # Summary outcomes: Discharged, DAMA, Death
     def summarize_outcomes(self):
         return (
             self.df["Outcome"]
@@ -313,7 +313,7 @@ st.dataframe(filtered_df.head(20), use_container_width=True)
 # OUTCOME SUMMARY
 # ============================================================
 
-st.header("2. Summarizing Outcomes: Discharged, DAMA, Death")
+st.header("Summary Outcomes: Discharged, DAMA, Death")
 
 outcome_summary = filtered_analyzer.summarize_outcomes()
 st.dataframe(outcome_summary, use_container_width=True)
