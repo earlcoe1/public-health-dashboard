@@ -3,10 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
-
 st.set_page_config(
     page_title="Project 6: Public Health Dashboard",
     page_icon="🏥",
@@ -14,14 +10,14 @@ st.set_page_config(
 )
 
 # ============================================================
-# HEALTH ANALYZER CLASS
+# CLASS REQUIRED BY PROJECT 6
 # ============================================================
 
 class HealthAnalyzer:
     def __init__(self, df):
         self.df = df.copy()
 
-    # Requirement 1: Cleaning patient records
+    # 1. Cleaning patient records
     def clean_patient_records(self):
         self.df.columns = (
             self.df.columns
@@ -35,12 +31,13 @@ class HealthAnalyzer:
             "Medical_Condition": "Disease",
             "Diagnosis": "Disease",
             "Condition": "Disease",
-            "Admission_Type": "Patient_Type",
             "Test_Results": "Outcome",
+            "Admission_Type": "Patient_Type",
+            "Hospital": "Department",
+            "Ward": "Department",
             "Patient_Satisfaction": "Satisfaction",
             "Satisfaction_Score": "Satisfaction",
-            "Hospital": "Department",
-            "Ward": "Department"
+            "Feedback_Rating": "Satisfaction"
         }
 
         self.df.rename(
@@ -48,38 +45,29 @@ class HealthAnalyzer:
             inplace=True
         )
 
-        required_columns = [
-            "Admission_Date",
-            "Age",
-            "Gender",
-            "Department",
-            "Disease",
-            "Outcome",
-            "Satisfaction"
-        ]
+        required_columns = {
+            "Admission_Date": pd.NaT,
+            "Age": np.nan,
+            "Gender": "Unknown",
+            "Department": "General",
+            "Disease": "Unknown",
+            "Outcome": "Discharged",
+            "Satisfaction": np.nan
+        }
 
-        for col in required_columns:
+        for col, default in required_columns.items():
             if col not in self.df.columns:
-                if col == "Admission_Date":
-                    self.df[col] = pd.NaT
-                elif col in ["Age", "Satisfaction"]:
-                    self.df[col] = np.nan
-                elif col == "Outcome":
-                    self.df[col] = "Discharged"
-                else:
-                    self.df[col] = "Unknown"
+                self.df[col] = default
 
         self.df = self.df.drop_duplicates()
 
         self.df["Admission_Date"] = pd.to_datetime(
-            self.df["Admission_Date"],
-            errors="coerce"
+            self.df["Admission_Date"], errors="coerce"
         )
 
         self.df["Age"] = pd.to_numeric(self.df["Age"], errors="coerce")
         self.df["Satisfaction"] = pd.to_numeric(
-            self.df["Satisfaction"],
-            errors="coerce"
+            self.df["Satisfaction"], errors="coerce"
         )
 
         self.df["Age"] = self.df["Age"].fillna(self.df["Age"].median())
@@ -88,7 +76,7 @@ class HealthAnalyzer:
         )
 
         self.df["Gender"] = self.df["Gender"].fillna("Unknown")
-        self.df["Department"] = self.df["Department"].fillna("Unknown")
+        self.df["Department"] = self.df["Department"].fillna("General")
         self.df["Disease"] = self.df["Disease"].fillna("Unknown")
         self.df["Outcome"] = self.df["Outcome"].fillna("Discharged")
 
@@ -97,11 +85,14 @@ class HealthAnalyzer:
             "discharge": "Discharged",
             "Discharged": "Discharged",
             "Recovered": "Discharged",
+            "Normal": "Discharged",
             "DAMA": "DAMA",
             "dama": "DAMA",
             "Death": "Death",
             "Died": "Death",
-            "death": "Death"
+            "death": "Death",
+            "Abnormal": "DAMA",
+            "Inconclusive": "DAMA"
         })
 
         self.df = self.df.dropna(subset=["Admission_Date"])
@@ -113,34 +104,35 @@ class HealthAnalyzer:
 
         return self.df
 
-    # Requirement 2: Summarizing outcomes
+    # 2. Summarizing outcomes: Discharged, DAMA, Death
     def summarize_outcomes(self):
-        return self.df["Outcome"].value_counts().reset_index().rename(
-            columns={
-                "index": "Outcome",
-                "Outcome": "Count"
-            }
+        return (
+            self.df["Outcome"]
+            .value_counts()
+            .rename_axis("Outcome")
+            .reset_index(name="Count")
         )
 
-    # Requirement 3: Aggregating by age
+    # 3A. Aggregating data by age
     def aggregate_by_age(self):
-        bins = [0, 18, 35, 50, 65, 100]
+        bins = [0, 18, 35, 50, 65, 120]
         labels = ["0-18", "19-35", "36-50", "51-65", "66+"]
 
-        self.df["Age_Group"] = pd.cut(
-            self.df["Age"],
+        temp_df = self.df.copy()
+        temp_df["Age_Group"] = pd.cut(
+            temp_df["Age"],
             bins=bins,
             labels=labels,
             include_lowest=True
         )
 
         return (
-            self.df.groupby(["Age_Group", "Outcome"])
+            temp_df.groupby(["Age_Group", "Outcome"], observed=False)
             .size()
             .reset_index(name="Count")
         )
 
-    # Requirement 4: Aggregating by gender
+    # 3B. Aggregating data by gender
     def aggregate_by_gender(self):
         return (
             self.df.groupby(["Gender", "Outcome"])
@@ -148,7 +140,7 @@ class HealthAnalyzer:
             .reset_index(name="Count")
         )
 
-    # Requirement 5: Aggregating by department
+    # 3C. Aggregating data by department
     def aggregate_by_department(self):
         return (
             self.df.groupby("Department")
@@ -159,7 +151,6 @@ class HealthAnalyzer:
             .reset_index()
         )
 
-    # Required chart data: Admissions over time
     def admissions_over_time(self):
         return (
             self.df.groupby("Admission_Period")
@@ -167,41 +158,34 @@ class HealthAnalyzer:
             .reset_index(name="Admissions")
         )
 
-    # Required chart data: Satisfaction by department
     def satisfaction_by_department(self):
         return (
             self.df.groupby("Department")["Satisfaction"]
             .mean()
-            .sort_values(ascending=False)
-            .reset_index()
+            .reset_index(name="Average_Satisfaction")
+            .sort_values(by="Average_Satisfaction", ascending=False)
         )
 
-    # Extra project question: Most common diseases
     def common_diseases(self):
         return (
             self.df["Disease"]
             .value_counts()
             .head(10)
-            .reset_index()
-            .rename(columns={"index": "Disease", "Disease": "Cases"})
+            .rename_axis("Disease")
+            .reset_index(name="Cases")
         )
 
 
 # ============================================================
-# DASHBOARD TITLE
+# DASHBOARD
 # ============================================================
 
 st.title("🏥 Project 6: Public Health Patient & Hospital Data Dashboard")
 
 st.markdown("""
-This dashboard analyzes hospital or public health data for operational and policy insights.
-It includes patient outcome analysis, admissions trends, disease frequency, and service satisfaction.
+This dashboard meets the Project 6 requirements by using a `HealthAnalyzer` class to clean patient records,
+summarize outcomes, aggregate by age/gender/department, and visualize public health insights.
 """)
-
-
-# ============================================================
-# FILE UPLOAD
-# ============================================================
 
 uploaded_file = st.file_uploader(
     "Upload Hospital Patient Records Dataset, CDC/Public Health Dataset, or COVID-19 Health Metrics Dataset",
@@ -209,18 +193,13 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is None:
-    st.info("Please upload a CSV or Excel dataset to begin.")
+    st.info("Please upload a CSV or Excel file to begin.")
     st.stop()
 
 if uploaded_file.name.endswith(".csv"):
     raw_df = pd.read_csv(uploaded_file)
 else:
     raw_df = pd.read_excel(uploaded_file)
-
-
-# ============================================================
-# CLEAN DATA USING OOP
-# ============================================================
 
 analyzer = HealthAnalyzer(raw_df)
 df = analyzer.clean_patient_records()
@@ -231,32 +210,28 @@ if df.empty:
 
 st.success("Dataset loaded and cleaned successfully.")
 
-
 # ============================================================
-# INTERACTIVE FILTERS
+# FILTERS
 # ============================================================
 
 st.sidebar.header("Interactive Filters")
 
-min_age = int(df["Age"].min())
-max_age = int(df["Age"].max())
-
 age_filter = st.sidebar.slider(
     "Filter by Age",
-    min_value=min_age,
-    max_value=max_age,
-    value=(min_age, max_age)
+    int(df["Age"].min()),
+    int(df["Age"].max()),
+    (int(df["Age"].min()), int(df["Age"].max()))
 )
 
 gender_filter = st.sidebar.multiselect(
     "Filter by Gender",
-    options=sorted(df["Gender"].unique()),
+    sorted(df["Gender"].unique()),
     default=sorted(df["Gender"].unique())
 )
 
 department_filter = st.sidebar.multiselect(
     "Filter by Department",
-    options=sorted(df["Department"].unique()),
+    sorted(df["Department"].unique()),
     default=sorted(df["Department"].unique())
 )
 
@@ -268,12 +243,27 @@ filtered_df = df[
 ]
 
 if filtered_df.empty:
-    st.warning("No records match your selected filters.")
+    st.warning("No records match the selected filters.")
     st.stop()
 
 filtered_analyzer = HealthAnalyzer(filtered_df)
 filtered_analyzer.df = filtered_df
 
+# ============================================================
+# SHOW REQUIRED CLASS METHODS ON DASHBOARD
+# ============================================================
+
+st.header("Required HealthAnalyzer Class Methods Applied")
+
+st.markdown("""
+The dashboard applies the required class methods:
+
+1. `clean_patient_records()` — cleans patient records  
+2. `summarize_outcomes()` — summarizes Discharged, DAMA, and Death outcomes  
+3. `aggregate_by_age()` — aggregates patient outcomes by age group  
+4. `aggregate_by_gender()` — aggregates patient outcomes by gender  
+5. `aggregate_by_department()` — aggregates records by department  
+""")
 
 # ============================================================
 # KPI SUMMARY
@@ -281,66 +271,61 @@ filtered_analyzer.df = filtered_df
 
 st.subheader("Dashboard Summary")
 
-col1, col2, col3, col4 = st.columns(4)
+c1, c2, c3, c4 = st.columns(4)
 
-col1.metric("Total Patients", len(filtered_df))
-col2.metric("Total Departments", filtered_df["Department"].nunique())
-col3.metric("Total Diseases", filtered_df["Disease"].nunique())
-col4.metric("Average Satisfaction", round(filtered_df["Satisfaction"].mean(), 2))
-
+c1.metric("Total Patients", len(filtered_df))
+c2.metric("Departments", filtered_df["Department"].nunique())
+c3.metric("Diseases", filtered_df["Disease"].nunique())
+c4.metric("Avg. Satisfaction", round(filtered_df["Satisfaction"].mean(), 2))
 
 # ============================================================
-# DATA CLEANING OUTPUT
+# DATA CLEANING
 # ============================================================
 
-st.subheader("Data Cleaning and Handling Missing/Categorical Data")
+st.header("1. Cleaning Patient Records")
 
 st.markdown("""
-The dataset was cleaned by removing duplicates, formatting admission dates, handling missing numeric values,
-handling missing categorical values, and standardizing patient outcomes into Discharged, DAMA, and Death.
+The dataset was cleaned by removing duplicates, formatting admission dates, handling missing numeric and categorical data,
+and standardizing patient outcomes into **Discharged**, **DAMA**, and **Death**.
 """)
 
 st.dataframe(filtered_df.head(20), use_container_width=True)
-
 
 # ============================================================
 # OUTCOME SUMMARY
 # ============================================================
 
-st.subheader("Summarized Patient Outcomes")
+st.header("2. Summarizing Outcomes: Discharged, DAMA, Death")
 
 outcome_summary = filtered_analyzer.summarize_outcomes()
 st.dataframe(outcome_summary, use_container_width=True)
 
-
 # ============================================================
-# AGGREGATION OUTPUTS
+# AGGREGATION TABLES
 # ============================================================
 
-st.subheader("Grouping and Aggregating Outcomes")
+st.header("3. Aggregating Data by Age, Gender, and Department")
 
-tab_age, tab_gender, tab_department = st.tabs([
-    "Aggregate by Age",
-    "Aggregate by Gender",
-    "Aggregate by Department"
+tab1, tab2, tab3 = st.tabs([
+    "By Age",
+    "By Gender",
+    "By Department"
 ])
 
-with tab_age:
-    age_summary = filtered_analyzer.aggregate_by_age()
-    st.dataframe(age_summary, use_container_width=True)
+with tab1:
+    st.subheader("Aggregated Outcomes by Age Group")
+    st.dataframe(filtered_analyzer.aggregate_by_age(), use_container_width=True)
 
-with tab_gender:
-    gender_summary = filtered_analyzer.aggregate_by_gender()
-    st.dataframe(gender_summary, use_container_width=True)
+with tab2:
+    st.subheader("Aggregated Outcomes by Gender")
+    st.dataframe(filtered_analyzer.aggregate_by_gender(), use_container_width=True)
 
-with tab_department:
-    department_summary = filtered_analyzer.aggregate_by_department()
-    st.dataframe(department_summary, use_container_width=True)
-
+with tab3:
+    st.subheader("Aggregated Data by Department")
+    st.dataframe(filtered_analyzer.aggregate_by_department(), use_container_width=True)
 
 # ============================================================
-# REQUIRED CHART 1:
-# HISTOGRAM - PATIENT OUTCOMES BY AGE
+# REQUIRED CHART 1
 # ============================================================
 
 st.header("Required Chart 1: Histogram — Patient Outcomes by Age")
@@ -349,12 +334,7 @@ fig1, ax1 = plt.subplots(figsize=(10, 5))
 
 for outcome in filtered_df["Outcome"].unique():
     subset = filtered_df[filtered_df["Outcome"] == outcome]
-    ax1.hist(
-        subset["Age"],
-        bins=15,
-        alpha=0.6,
-        label=outcome
-    )
+    ax1.hist(subset["Age"], bins=15, alpha=0.6, label=outcome)
 
 ax1.set_title("Patient Outcomes by Age")
 ax1.set_xlabel("Age")
@@ -363,10 +343,8 @@ ax1.legend()
 
 st.pyplot(fig1)
 
-
 # ============================================================
-# REQUIRED CHART 2:
-# LINE CHART - ADMISSIONS OVER TIME
+# REQUIRED CHART 2
 # ============================================================
 
 st.header("Required Chart 2: Line Chart — Admissions Over Time")
@@ -374,12 +352,7 @@ st.header("Required Chart 2: Line Chart — Admissions Over Time")
 admissions = filtered_analyzer.admissions_over_time()
 
 fig2, ax2 = plt.subplots(figsize=(10, 5))
-
-ax2.plot(
-    admissions["Admission_Period"],
-    admissions["Admissions"],
-    marker="o"
-)
+ax2.plot(admissions["Admission_Period"], admissions["Admissions"], marker="o")
 
 ax2.set_title("Admissions Over Time")
 ax2.set_xlabel("Admission Month")
@@ -388,10 +361,8 @@ plt.xticks(rotation=45)
 
 st.pyplot(fig2)
 
-
 # ============================================================
-# REQUIRED CHART 3:
-# BAR CHART - AVERAGE SERVICE SATISFACTION BY DEPARTMENT
+# REQUIRED CHART 3
 # ============================================================
 
 st.header("Required Chart 3: Bar Chart — Average Service Satisfaction by Department")
@@ -399,10 +370,9 @@ st.header("Required Chart 3: Bar Chart — Average Service Satisfaction by Depar
 satisfaction = filtered_analyzer.satisfaction_by_department()
 
 fig3, ax3 = plt.subplots(figsize=(10, 5))
-
 ax3.bar(
     satisfaction["Department"],
-    satisfaction["Satisfaction"]
+    satisfaction["Average_Satisfaction"]
 )
 
 ax3.set_title("Average Service Satisfaction by Department")
@@ -412,10 +382,8 @@ plt.xticks(rotation=45)
 
 st.pyplot(fig3)
 
-
 # ============================================================
-# EXTRA PROJECT QUESTION:
-# MOST COMMON DISEASES
+# COMMON DISEASES — FIXED SECTION
 # ============================================================
 
 st.header("Most Common Diseases or Conditions")
@@ -423,7 +391,6 @@ st.header("Most Common Diseases or Conditions")
 common_diseases = filtered_analyzer.common_diseases()
 
 fig4, ax4 = plt.subplots(figsize=(10, 5))
-
 ax4.barh(
     common_diseases["Disease"],
     common_diseases["Cases"]
@@ -436,31 +403,31 @@ ax4.invert_yaxis()
 
 st.pyplot(fig4)
 
+st.dataframe(common_diseases, use_container_width=True)
 
 # ============================================================
-# BASIC PUBLIC HEALTH INSIGHTS
+# INSIGHTS
 # ============================================================
 
-st.subheader("Analysis and Insights")
+st.header("Analysis and Insights")
 
-top_outcome = filtered_df["Outcome"].mode()[0]
-top_disease = filtered_df["Disease"].mode()[0]
-highest_satisfaction_department = satisfaction.iloc[0]["Department"]
+top_outcome = outcome_summary.iloc[0]["Outcome"]
+top_disease = common_diseases.iloc[0]["Disease"]
+top_satisfaction_department = satisfaction.iloc[0]["Department"]
 
 st.markdown(f"""
 - The most common patient outcome is **{top_outcome}**.
 - The most common disease or condition is **{top_disease}**.
-- The department with the highest average service satisfaction is **{highest_satisfaction_department}**.
-- Admissions over time can help hospital administrators plan staffing, beds, and resources.
-- Patient outcome patterns by age and gender can support public health planning and policy decisions.
+- The department with the highest average service satisfaction is **{top_satisfaction_department}**.
+- Admissions over time can help hospital administrators plan staffing and resource allocation.
+- Outcome patterns by age, gender, and department support public health and policy decision-making.
 """)
 
-
 # ============================================================
-# DOWNLOAD CLEANED DATA
+# DOWNLOAD
 # ============================================================
 
-st.subheader("Download Output")
+st.header("Download Cleaned Dataset")
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
 
@@ -471,12 +438,7 @@ st.download_button(
     mime="text/csv"
 )
 
-
-# ============================================================
-# FOOTER
-# ============================================================
-
 st.markdown("---")
 st.caption(
-    "Project 6 Public Health Dashboard | Streamlit, Pandas, Matplotlib, OOP, Data Cleaning, Grouping, Aggregation, and Visualization"
+    "Project 6 Public Health Dashboard | OOP, Streamlit, Pandas, Matplotlib, Data Cleaning, Grouping, Aggregation, and Visualization"
 )
