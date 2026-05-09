@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 
 # ============================================================
-# PAGE SETUP
+# PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
@@ -15,74 +14,15 @@ st.set_page_config(
 )
 
 # ============================================================
-# CSS DESIGN
-# ============================================================
-
-st.markdown("""
-<style>
-.dashboard-title {
-    text-align: center;
-    font-size: 42px;
-    font-weight: 800;
-    color: #0f172a;
-}
-.dashboard-subtitle {
-    text-align: center;
-    font-size: 18px;
-    color: #475569;
-    margin-bottom: 25px;
-}
-.metric-card {
-    background-color: white;
-    padding: 20px;
-    border-radius: 14px;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.10);
-    text-align: center;
-    border-left: 6px solid #2563eb;
-}
-.metric-value {
-    font-size: 28px;
-    font-weight: 800;
-    color: #1e293b;
-}
-.metric-label {
-    font-size: 14px;
-    color: #64748b;
-}
-.insight-box {
-    background-color: #eff6ff;
-    border-left: 6px solid #2563eb;
-    padding: 16px;
-    border-radius: 10px;
-    margin-bottom: 12px;
-}
-.warning-box {
-    background-color: #fff7ed;
-    border-left: 6px solid #f97316;
-    padding: 16px;
-    border-radius: 10px;
-    margin-bottom: 12px;
-}
-.success-box {
-    background-color: #ecfdf5;
-    border-left: 6px solid #059669;
-    padding: 16px;
-    border-radius: 10px;
-    margin-bottom: 12px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-# ============================================================
-# OOP CLASS
+# HEALTH ANALYZER CLASS
 # ============================================================
 
 class HealthAnalyzer:
     def __init__(self, df):
         self.df = df.copy()
 
-    def standardize_columns(self):
+    # Requirement 1: Cleaning patient records
+    def clean_patient_records(self):
         self.df.columns = (
             self.df.columns
             .str.strip()
@@ -92,17 +32,15 @@ class HealthAnalyzer:
 
         rename_map = {
             "Date_of_Admission": "Admission_Date",
-            "Discharge_Date": "Discharge_Date",
             "Medical_Condition": "Disease",
-            "Condition": "Disease",
             "Diagnosis": "Disease",
-            "Test_Results": "Outcome",
+            "Condition": "Disease",
             "Admission_Type": "Patient_Type",
-            "Hospital": "Department",
-            "Ward": "Department",
+            "Test_Results": "Outcome",
             "Patient_Satisfaction": "Satisfaction",
             "Satisfaction_Score": "Satisfaction",
-            "Feedback_Rating": "Satisfaction"
+            "Hospital": "Department",
+            "Ward": "Department"
         }
 
         self.df.rename(
@@ -110,71 +48,64 @@ class HealthAnalyzer:
             inplace=True
         )
 
-    def clean_data(self):
-        self.standardize_columns()
+        required_columns = [
+            "Admission_Date",
+            "Age",
+            "Gender",
+            "Department",
+            "Disease",
+            "Outcome",
+            "Satisfaction"
+        ]
+
+        for col in required_columns:
+            if col not in self.df.columns:
+                if col == "Admission_Date":
+                    self.df[col] = pd.NaT
+                elif col in ["Age", "Satisfaction"]:
+                    self.df[col] = np.nan
+                elif col == "Outcome":
+                    self.df[col] = "Discharged"
+                else:
+                    self.df[col] = "Unknown"
 
         self.df = self.df.drop_duplicates()
 
-        required_defaults = {
-            "Admission_Date": pd.NaT,
-            "Disease": "Unknown",
-            "Outcome": "Discharged",
-            "Department": "General",
-            "Age": np.nan,
-            "Gender": "Unknown",
-            "Length_of_Stay": np.nan,
-            "Satisfaction": np.nan,
-            "Patient_Type": "Unknown"
-        }
-
-        for col, default in required_defaults.items():
-            if col not in self.df.columns:
-                self.df[col] = default
-
         self.df["Admission_Date"] = pd.to_datetime(
-            self.df["Admission_Date"], errors="coerce"
+            self.df["Admission_Date"],
+            errors="coerce"
         )
 
         self.df["Age"] = pd.to_numeric(self.df["Age"], errors="coerce")
-        self.df["Length_of_Stay"] = pd.to_numeric(
-            self.df["Length_of_Stay"], errors="coerce"
-        )
         self.df["Satisfaction"] = pd.to_numeric(
-            self.df["Satisfaction"], errors="coerce"
+            self.df["Satisfaction"],
+            errors="coerce"
         )
 
         self.df["Age"] = self.df["Age"].fillna(self.df["Age"].median())
-        self.df["Length_of_Stay"] = self.df["Length_of_Stay"].fillna(
-            self.df["Length_of_Stay"].median()
-        )
         self.df["Satisfaction"] = self.df["Satisfaction"].fillna(
             self.df["Satisfaction"].mean()
         )
 
+        self.df["Gender"] = self.df["Gender"].fillna("Unknown")
+        self.df["Department"] = self.df["Department"].fillna("Unknown")
         self.df["Disease"] = self.df["Disease"].fillna("Unknown")
         self.df["Outcome"] = self.df["Outcome"].fillna("Discharged")
-        self.df["Department"] = self.df["Department"].fillna("General")
-        self.df["Gender"] = self.df["Gender"].fillna("Unknown")
-        self.df["Patient_Type"] = self.df["Patient_Type"].fillna("Unknown")
 
         self.df["Outcome"] = self.df["Outcome"].replace({
             "Discharge": "Discharged",
             "discharge": "Discharged",
             "Discharged": "Discharged",
+            "Recovered": "Discharged",
             "DAMA": "DAMA",
             "dama": "DAMA",
             "Death": "Death",
             "Died": "Death",
-            "death": "Death",
-            "Recovered": "Discharged",
-            "Normal": "Discharged",
-            "Abnormal": "DAMA",
-            "Inconclusive": "DAMA"
+            "death": "Death"
         })
 
-        self.df = self.df[self.df["Age"] >= 0]
-        self.df = self.df[self.df["Length_of_Stay"] >= 0]
         self.df = self.df.dropna(subset=["Admission_Date"])
+        self.df = self.df[self.df["Age"] >= 0]
 
         self.df["Year"] = self.df["Admission_Date"].dt.year
         self.df["Month"] = self.df["Admission_Date"].dt.month
@@ -182,60 +113,103 @@ class HealthAnalyzer:
 
         return self.df
 
-    def kpi_summary(self, df):
-        return {
-            "Total Patients": len(df),
-            "Diseases": df["Disease"].nunique(),
-            "Departments": df["Department"].nunique(),
-            "Avg Age": round(df["Age"].mean(), 1),
-            "Avg Stay": round(df["Length_of_Stay"].mean(), 1),
-            "Avg Satisfaction": round(df["Satisfaction"].mean(), 1)
-        }
+    # Requirement 2: Summarizing outcomes
+    def summarize_outcomes(self):
+        return self.df["Outcome"].value_counts().reset_index().rename(
+            columns={
+                "index": "Outcome",
+                "Outcome": "Count"
+            }
+        )
 
-    def outcome_summary(self, df):
-        return df["Outcome"].value_counts()
+    # Requirement 3: Aggregating by age
+    def aggregate_by_age(self):
+        bins = [0, 18, 35, 50, 65, 100]
+        labels = ["0-18", "19-35", "36-50", "51-65", "66+"]
 
-    def admissions_over_time(self, df):
-        return df.groupby("Admission_Period").size().reset_index(name="Admissions")
+        self.df["Age_Group"] = pd.cut(
+            self.df["Age"],
+            bins=bins,
+            labels=labels,
+            include_lowest=True
+        )
 
-    def disease_counts(self, df):
-        return df["Disease"].value_counts().head(10)
+        return (
+            self.df.groupby(["Age_Group", "Outcome"])
+            .size()
+            .reset_index(name="Count")
+        )
 
-    def length_of_stay_by_department(self, df):
-        return df.groupby("Department")["Length_of_Stay"].mean().sort_values(ascending=False)
+    # Requirement 4: Aggregating by gender
+    def aggregate_by_gender(self):
+        return (
+            self.df.groupby(["Gender", "Outcome"])
+            .size()
+            .reset_index(name="Count")
+        )
 
-    def length_of_stay_by_patient_type(self, df):
-        return df.groupby("Patient_Type")["Length_of_Stay"].mean().sort_values(ascending=False)
+    # Requirement 5: Aggregating by department
+    def aggregate_by_department(self):
+        return (
+            self.df.groupby("Department")
+            .agg(
+                Total_Patients=("Department", "count"),
+                Average_Satisfaction=("Satisfaction", "mean")
+            )
+            .reset_index()
+        )
 
-    def satisfaction_by_department(self, df):
-        return df.groupby("Department")["Satisfaction"].mean().sort_values(ascending=False)
+    # Required chart data: Admissions over time
+    def admissions_over_time(self):
+        return (
+            self.df.groupby("Admission_Period")
+            .size()
+            .reset_index(name="Admissions")
+        )
 
-    def outcome_by_gender(self, df):
-        return df.groupby(["Gender", "Outcome"]).size().reset_index(name="Count")
+    # Required chart data: Satisfaction by department
+    def satisfaction_by_department(self):
+        return (
+            self.df.groupby("Department")["Satisfaction"]
+            .mean()
+            .sort_values(ascending=False)
+            .reset_index()
+        )
+
+    # Extra project question: Most common diseases
+    def common_diseases(self):
+        return (
+            self.df["Disease"]
+            .value_counts()
+            .head(10)
+            .reset_index()
+            .rename(columns={"index": "Disease", "Disease": "Cases"})
+        )
 
 
 # ============================================================
-# HEADER
+# DASHBOARD TITLE
 # ============================================================
+
+st.title("🏥 Project 6: Public Health Patient & Hospital Data Dashboard")
 
 st.markdown("""
-<div class="dashboard-title">🏥 Project 6: Public Health Dashboard</div>
-<div class="dashboard-subtitle">
-Patient and hospital data dashboard for operational, policy, quality, and public health insights.
-</div>
-""", unsafe_allow_html=True)
+This dashboard analyzes hospital or public health data for operational and policy insights.
+It includes patient outcome analysis, admissions trends, disease frequency, and service satisfaction.
+""")
+
 
 # ============================================================
 # FILE UPLOAD
 # ============================================================
 
 uploaded_file = st.file_uploader(
-    "Upload hospital or public health dataset",
+    "Upload Hospital Patient Records Dataset, CDC/Public Health Dataset, or COVID-19 Health Metrics Dataset",
     type=["csv", "xlsx"]
 )
 
-if not uploaded_file:
-    st.info("Upload your CSV or Excel dataset to begin.")
+if uploaded_file is None:
+    st.info("Please upload a CSV or Excel dataset to begin.")
     st.stop()
 
 if uploaded_file.name.endswith(".csv"):
@@ -243,399 +217,260 @@ if uploaded_file.name.endswith(".csv"):
 else:
     raw_df = pd.read_excel(uploaded_file)
 
+
+# ============================================================
+# CLEAN DATA USING OOP
+# ============================================================
+
 analyzer = HealthAnalyzer(raw_df)
-df = analyzer.clean_data()
+df = analyzer.clean_patient_records()
 
 if df.empty:
     st.error("No usable records found after cleaning.")
     st.stop()
 
-st.success("Dataset uploaded, cleaned, and prepared successfully.")
+st.success("Dataset loaded and cleaned successfully.")
+
 
 # ============================================================
-# SIDEBAR FILTERS
+# INTERACTIVE FILTERS
 # ============================================================
 
 st.sidebar.header("Interactive Filters")
 
+min_age = int(df["Age"].min())
+max_age = int(df["Age"].max())
+
+age_filter = st.sidebar.slider(
+    "Filter by Age",
+    min_value=min_age,
+    max_value=max_age,
+    value=(min_age, max_age)
+)
+
 gender_filter = st.sidebar.multiselect(
-    "Gender",
-    sorted(df["Gender"].unique()),
+    "Filter by Gender",
+    options=sorted(df["Gender"].unique()),
     default=sorted(df["Gender"].unique())
 )
 
 department_filter = st.sidebar.multiselect(
-    "Department",
-    sorted(df["Department"].unique()),
+    "Filter by Department",
+    options=sorted(df["Department"].unique()),
     default=sorted(df["Department"].unique())
 )
 
-disease_filter = st.sidebar.multiselect(
-    "Disease / Condition",
-    sorted(df["Disease"].unique()),
-    default=sorted(df["Disease"].unique())
-)
-
-outcome_filter = st.sidebar.multiselect(
-    "Outcome",
-    sorted(df["Outcome"].unique()),
-    default=sorted(df["Outcome"].unique())
-)
-
-patient_type_filter = st.sidebar.multiselect(
-    "Patient Type",
-    sorted(df["Patient_Type"].unique()),
-    default=sorted(df["Patient_Type"].unique())
-)
-
-age_range = st.sidebar.slider(
-    "Age Range",
-    int(df["Age"].min()),
-    int(df["Age"].max()),
-    (int(df["Age"].min()), int(df["Age"].max()))
-)
-
 filtered_df = df[
+    (df["Age"] >= age_filter[0]) &
+    (df["Age"] <= age_filter[1]) &
     (df["Gender"].isin(gender_filter)) &
-    (df["Department"].isin(department_filter)) &
-    (df["Disease"].isin(disease_filter)) &
-    (df["Outcome"].isin(outcome_filter)) &
-    (df["Patient_Type"].isin(patient_type_filter)) &
-    (df["Age"] >= age_range[0]) &
-    (df["Age"] <= age_range[1])
+    (df["Department"].isin(department_filter))
 ]
 
 if filtered_df.empty:
-    st.warning("No records match the selected filters.")
+    st.warning("No records match your selected filters.")
     st.stop()
+
+filtered_analyzer = HealthAnalyzer(filtered_df)
+filtered_analyzer.df = filtered_df
+
 
 # ============================================================
 # KPI SUMMARY
 # ============================================================
 
-st.subheader("Executive KPI Summary")
+st.subheader("Dashboard Summary")
 
-kpis = analyzer.kpi_summary(filtered_df)
-cols = st.columns(6)
+col1, col2, col3, col4 = st.columns(4)
 
-for col, key in zip(cols, kpis.keys()):
-    with col:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{kpis[key]}</div>
-            <div class="metric-label">{key}</div>
-        </div>
-        """, unsafe_allow_html=True)
+col1.metric("Total Patients", len(filtered_df))
+col2.metric("Total Departments", filtered_df["Department"].nunique())
+col3.metric("Total Diseases", filtered_df["Disease"].nunique())
+col4.metric("Average Satisfaction", round(filtered_df["Satisfaction"].mean(), 2))
+
 
 # ============================================================
-# TABS
+# DATA CLEANING OUTPUT
 # ============================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "Data Preparation",
-    "Patient Outcomes",
-    "Admissions Trend",
-    "Disease Burden",
-    "Department Analysis",
-    "Downloads & Insights"
+st.subheader("Data Cleaning and Handling Missing/Categorical Data")
+
+st.markdown("""
+The dataset was cleaned by removing duplicates, formatting admission dates, handling missing numeric values,
+handling missing categorical values, and standardizing patient outcomes into Discharged, DAMA, and Death.
+""")
+
+st.dataframe(filtered_df.head(20), use_container_width=True)
+
+
+# ============================================================
+# OUTCOME SUMMARY
+# ============================================================
+
+st.subheader("Summarized Patient Outcomes")
+
+outcome_summary = filtered_analyzer.summarize_outcomes()
+st.dataframe(outcome_summary, use_container_width=True)
+
+
+# ============================================================
+# AGGREGATION OUTPUTS
+# ============================================================
+
+st.subheader("Grouping and Aggregating Outcomes")
+
+tab_age, tab_gender, tab_department = st.tabs([
+    "Aggregate by Age",
+    "Aggregate by Gender",
+    "Aggregate by Department"
 ])
 
+with tab_age:
+    age_summary = filtered_analyzer.aggregate_by_age()
+    st.dataframe(age_summary, use_container_width=True)
+
+with tab_gender:
+    gender_summary = filtered_analyzer.aggregate_by_gender()
+    st.dataframe(gender_summary, use_container_width=True)
+
+with tab_department:
+    department_summary = filtered_analyzer.aggregate_by_department()
+    st.dataframe(department_summary, use_container_width=True)
+
+
 # ============================================================
-# TAB 1: DATA PREPARATION
+# REQUIRED CHART 1:
+# HISTOGRAM - PATIENT OUTCOMES BY AGE
 # ============================================================
 
-with tab1:
-    st.header("Step 1: Data Preparation and Cleaning")
+st.header("Required Chart 1: Histogram — Patient Outcomes by Age")
 
-    st.markdown("""
-    This dashboard performs the following cleaning steps:
+fig1, ax1 = plt.subplots(figsize=(10, 5))
 
-    - Loads CSV or Excel files using Pandas.
-    - Removes duplicate records.
-    - Standardizes column names.
-    - Converts admission dates to proper date format.
-    - Handles missing numeric values using median or mean.
-    - Handles missing categorical values using default labels.
-    - Standardizes patient outcomes such as Discharged, DAMA, and Death.
-    - Creates year, month, and admission period fields for trend analysis.
-    """)
-
-    st.subheader("Cleaned Dataset Preview")
-    st.dataframe(filtered_df.head(30), use_container_width=True)
-
-    st.subheader("Numeric Summary")
-    st.dataframe(
-        filtered_df[["Age", "Length_of_Stay", "Satisfaction"]].describe(),
-        use_container_width=True
+for outcome in filtered_df["Outcome"].unique():
+    subset = filtered_df[filtered_df["Outcome"] == outcome]
+    ax1.hist(
+        subset["Age"],
+        bins=15,
+        alpha=0.6,
+        label=outcome
     )
 
-    st.subheader("Categorical Summary")
-    cat_summary = pd.DataFrame({
-        "Column": ["Disease", "Outcome", "Department", "Gender", "Patient_Type"],
-        "Unique Values": [
-            filtered_df["Disease"].nunique(),
-            filtered_df["Outcome"].nunique(),
-            filtered_df["Department"].nunique(),
-            filtered_df["Gender"].nunique(),
-            filtered_df["Patient_Type"].nunique()
-        ],
-        "Most Common Value": [
-            filtered_df["Disease"].mode()[0],
-            filtered_df["Outcome"].mode()[0],
-            filtered_df["Department"].mode()[0],
-            filtered_df["Gender"].mode()[0],
-            filtered_df["Patient_Type"].mode()[0]
-        ]
-    })
+ax1.set_title("Patient Outcomes by Age")
+ax1.set_xlabel("Age")
+ax1.set_ylabel("Number of Patients")
+ax1.legend()
 
-    st.dataframe(cat_summary, use_container_width=True)
+st.pyplot(fig1)
+
 
 # ============================================================
-# TAB 2: PATIENT OUTCOMES
-# Requirement: distribution of outcomes by age or gender
-# Chart: Histogram patient outcomes by age
+# REQUIRED CHART 2:
+# LINE CHART - ADMISSIONS OVER TIME
 # ============================================================
 
-with tab2:
-    st.header("Patient Outcomes Analysis")
+st.header("Required Chart 2: Line Chart — Admissions Over Time")
 
-    st.subheader("Outcome Distribution")
+admissions = filtered_analyzer.admissions_over_time()
 
-    outcome_counts = analyzer.outcome_summary(filtered_df)
+fig2, ax2 = plt.subplots(figsize=(10, 5))
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    sns.barplot(x=outcome_counts.index, y=outcome_counts.values, ax=ax)
-    ax.set_title("Patient Outcome Distribution")
-    ax.set_xlabel("Outcome")
-    ax.set_ylabel("Number of Patients")
-    st.pyplot(fig)
+ax2.plot(
+    admissions["Admission_Period"],
+    admissions["Admissions"],
+    marker="o"
+)
 
-    st.subheader("Required Chart: Histogram of Patient Outcomes by Age")
+ax2.set_title("Admissions Over Time")
+ax2.set_xlabel("Admission Month")
+ax2.set_ylabel("Number of Admissions")
+plt.xticks(rotation=45)
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.histplot(
-        data=filtered_df,
-        x="Age",
-        hue="Outcome",
-        multiple="stack",
-        bins=20,
-        ax=ax
-    )
-    ax.set_title("Patient Outcomes by Age")
-    ax.set_xlabel("Patient Age")
-    ax.set_ylabel("Number of Patients")
-    st.pyplot(fig)
+st.pyplot(fig2)
 
-    st.subheader("Patient Outcomes by Gender")
-
-    outcome_gender = analyzer.outcome_by_gender(filtered_df)
-
-    fig, ax = plt.subplots(figsize=(9, 5))
-    sns.barplot(
-        data=outcome_gender,
-        x="Gender",
-        y="Count",
-        hue="Outcome",
-        ax=ax
-    )
-    ax.set_title("Patient Outcomes by Gender")
-    ax.set_xlabel("Gender")
-    ax.set_ylabel("Number of Patients")
-    st.pyplot(fig)
 
 # ============================================================
-# TAB 3: ADMISSIONS TREND
-# Requirement: admissions per month or year
-# Chart: Line chart admissions over time
+# REQUIRED CHART 3:
+# BAR CHART - AVERAGE SERVICE SATISFACTION BY DEPARTMENT
 # ============================================================
 
-with tab3:
-    st.header("Admissions Over Time")
+st.header("Required Chart 3: Bar Chart — Average Service Satisfaction by Department")
 
-    admissions = analyzer.admissions_over_time(filtered_df)
+satisfaction = filtered_analyzer.satisfaction_by_department()
 
-    st.subheader("Required Chart: Line Chart of Admissions Over Time")
+fig3, ax3 = plt.subplots(figsize=(10, 5))
 
-    fig, ax = plt.subplots(figsize=(11, 5))
-    sns.lineplot(
-        data=admissions,
-        x="Admission_Period",
-        y="Admissions",
-        marker="o",
-        ax=ax
-    )
-    ax.set_title("Monthly Admissions Trend")
-    ax.set_xlabel("Month")
-    ax.set_ylabel("Number of Admissions")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+ax3.bar(
+    satisfaction["Department"],
+    satisfaction["Satisfaction"]
+)
 
-    st.dataframe(admissions, use_container_width=True)
+ax3.set_title("Average Service Satisfaction by Department")
+ax3.set_xlabel("Department")
+ax3.set_ylabel("Average Satisfaction Rating")
+plt.xticks(rotation=45)
+
+st.pyplot(fig3)
+
 
 # ============================================================
-# TAB 4: DISEASE BURDEN
-# Requirement: most common diseases or conditions
+# EXTRA PROJECT QUESTION:
+# MOST COMMON DISEASES
 # ============================================================
 
-with tab4:
-    st.header("Disease Burden Analysis")
+st.header("Most Common Diseases or Conditions")
 
-    disease_counts = analyzer.disease_counts(filtered_df)
+common_diseases = filtered_analyzer.common_diseases()
 
-    st.subheader("Top 10 Most Common Diseases or Conditions")
+fig4, ax4 = plt.subplots(figsize=(10, 5))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.barplot(
-        x=disease_counts.values,
-        y=disease_counts.index,
-        ax=ax
-    )
-    ax.set_title("Top 10 Most Common Diseases or Conditions")
-    ax.set_xlabel("Number of Cases")
-    ax.set_ylabel("Disease")
-    st.pyplot(fig)
+ax4.barh(
+    common_diseases["Disease"],
+    common_diseases["Cases"]
+)
 
-    st.dataframe(
-        disease_counts.reset_index().rename(
-            columns={"index": "Disease", "Disease": "Cases"}
-        ),
-        use_container_width=True
-    )
+ax4.set_title("Top 10 Most Common Diseases or Conditions")
+ax4.set_xlabel("Number of Cases")
+ax4.set_ylabel("Disease")
+ax4.invert_yaxis()
+
+st.pyplot(fig4)
+
 
 # ============================================================
-# TAB 5: DEPARTMENT ANALYSIS
-# Requirements:
-# - Length of stay by department or patient type
-# - Satisfaction by department
-# - Bar chart average service satisfaction by department
+# BASIC PUBLIC HEALTH INSIGHTS
 # ============================================================
 
-with tab5:
-    st.header("Department and Patient Type Analysis")
+st.subheader("Analysis and Insights")
 
-    st.subheader("Length of Stay by Department")
+top_outcome = filtered_df["Outcome"].mode()[0]
+top_disease = filtered_df["Disease"].mode()[0]
+highest_satisfaction_department = satisfaction.iloc[0]["Department"]
 
-    los_department = analyzer.length_of_stay_by_department(filtered_df)
+st.markdown(f"""
+- The most common patient outcome is **{top_outcome}**.
+- The most common disease or condition is **{top_disease}**.
+- The department with the highest average service satisfaction is **{highest_satisfaction_department}**.
+- Admissions over time can help hospital administrators plan staffing, beds, and resources.
+- Patient outcome patterns by age and gender can support public health planning and policy decisions.
+""")
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(
-        x=los_department.index,
-        y=los_department.values,
-        ax=ax
-    )
-    ax.set_title("Average Length of Stay by Department")
-    ax.set_xlabel("Department")
-    ax.set_ylabel("Average Length of Stay")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
-
-    st.subheader("Length of Stay by Patient Type")
-
-    los_patient_type = analyzer.length_of_stay_by_patient_type(filtered_df)
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    sns.barplot(
-        x=los_patient_type.index,
-        y=los_patient_type.values,
-        ax=ax
-    )
-    ax.set_title("Average Length of Stay by Patient Type")
-    ax.set_xlabel("Patient Type")
-    ax.set_ylabel("Average Length of Stay")
-    plt.xticks(rotation=30)
-    st.pyplot(fig)
-
-    st.subheader("Required Chart: Average Service Satisfaction by Department")
-
-    satisfaction = analyzer.satisfaction_by_department(filtered_df)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(
-        x=satisfaction.index,
-        y=satisfaction.values,
-        ax=ax
-    )
-    ax.set_title("Average Service Satisfaction by Department")
-    ax.set_xlabel("Department")
-    ax.set_ylabel("Average Satisfaction Rating")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
 
 # ============================================================
-# TAB 6: INSIGHTS AND DOWNLOADS
+# DOWNLOAD CLEANED DATA
 # ============================================================
 
-with tab6:
-    st.header("Key Findings and Actionable Insights")
+st.subheader("Download Output")
 
-    top_disease = filtered_df["Disease"].mode()[0]
-    top_outcome = filtered_df["Outcome"].mode()[0]
-    highest_los_dept = analyzer.length_of_stay_by_department(filtered_df).index[0]
-    lowest_satisfaction_dept = analyzer.satisfaction_by_department(filtered_df).index[-1]
-    highest_admission_month = analyzer.admissions_over_time(filtered_df).sort_values(
-        by="Admissions",
-        ascending=False
-    ).iloc[0]["Admission_Period"]
+csv = filtered_df.to_csv(index=False).encode("utf-8")
 
-    st.markdown(f"""
-    <div class="insight-box">
-    <b>1. Patient Outcomes:</b> The most frequent patient outcome is 
-    <b>{top_outcome}</b>. This helps summarize the general hospital outcome pattern.
-    </div>
-    """, unsafe_allow_html=True)
+st.download_button(
+    label="Download Cleaned Filtered Dataset",
+    data=csv,
+    file_name="project6_cleaned_public_health_data.csv",
+    mime="text/csv"
+)
 
-    st.markdown(f"""
-    <div class="insight-box">
-    <b>2. Disease Burden:</b> The most common disease or condition is 
-    <b>{top_disease}</b>. Hospital leaders can use this to prioritize preventive care and resource planning.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="warning-box">
-    <b>3. Length of Stay:</b> The department with the highest average length of stay is 
-    <b>{highest_los_dept}</b>. This may indicate higher case complexity or operational delays.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="success-box">
-    <b>4. Satisfaction:</b> The department with the lowest average satisfaction rating is 
-    <b>{lowest_satisfaction_dept}</b>. This area may need service quality improvement.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="insight-box">
-    <b>5. Admissions Trend:</b> The highest number of admissions occurred in 
-    <b>{highest_admission_month}</b>. This can support staffing and budget planning.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.subheader("Download Cleaned and Filtered Dataset")
-
-    csv = filtered_df.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        label="Download Cleaned Dataset CSV",
-        data=csv,
-        file_name="project6_cleaned_public_health_data.csv",
-        mime="text/csv"
-    )
-
-    summary_report = pd.DataFrame({
-        "Metric": list(kpis.keys()),
-        "Value": list(kpis.values())
-    })
-
-    summary_csv = summary_report.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        label="Download KPI Summary Report",
-        data=summary_csv,
-        file_name="project6_kpi_summary_report.csv",
-        mime="text/csv"
-    )
 
 # ============================================================
 # FOOTER
@@ -643,5 +478,5 @@ with tab6:
 
 st.markdown("---")
 st.caption(
-    "Project 6: Public Health Patient & Hospital Data Dashboard | Python, OOP, Streamlit, Pandas, Matplotlib, and Seaborn"
+    "Project 6 Public Health Dashboard | Streamlit, Pandas, Matplotlib, OOP, Data Cleaning, Grouping, Aggregation, and Visualization"
 )
