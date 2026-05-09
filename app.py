@@ -17,7 +17,7 @@ class HealthAnalyzer:
     def __init__(self, df):
         self.df = df.copy()
 
-    # 1. Cleaning patient records
+    # Patient records
     def clean_patient_records(self):
         self.df.columns = (
             self.df.columns
