@@ -80,19 +80,32 @@ class HealthAnalyzer:
         self.df["Disease"] = self.df["Disease"].fillna("Unknown")
         self.df["Outcome"] = self.df["Outcome"].fillna("Discharged")
 
+        # ====================================================
+        # UPDATED OUTCOME CLEANING: ENSURES DAMA APPEARS
+        # ====================================================
+
+        self.df["Outcome"] = (
+            self.df["Outcome"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
         self.df["Outcome"] = self.df["Outcome"].replace({
-            "Discharge": "Discharged",
-            "discharge": "Discharged",
-            "Discharged": "Discharged",
-            "Recovered": "Discharged",
-            "Normal": "Discharged",
+            "DISCHARGE": "Discharged",
+            "DISCHARGED": "Discharged",
+            "RECOVERED": "Discharged",
+            "NORMAL": "Discharged",
+
             "DAMA": "DAMA",
-            "dama": "DAMA",
-            "Death": "Death",
-            "Died": "Death",
-            "death": "Death",
-            "Abnormal": "DAMA",
-            "Inconclusive": "DAMA"
+            "AGAINST MEDICAL ADVICE": "DAMA",
+            "LEFT AGAINST MEDICAL ADVICE": "DAMA",
+            "ABNORMAL": "DAMA",
+            "INCONCLUSIVE": "DAMA",
+
+            "DEATH": "Death",
+            "DIED": "Death",
+            "DECEASED": "Death"
         })
 
         self.df = self.df.dropna(subset=["Admission_Date"])
@@ -210,7 +223,6 @@ if df.empty:
 
 st.success("Dataset loaded and cleaned successfully.")
 
-
 # ============================================================
 # INTERACTIVE SIDEBAR FILTERS
 # ============================================================
@@ -219,6 +231,8 @@ st.sidebar.header("Interactive Filters")
 
 gender_options = ["All"] + sorted(df["Gender"].dropna().unique().tolist())
 department_options = ["All"] + sorted(df["Department"].dropna().unique().tolist())
+
+# Ensures DAMA appears if it exists after cleaning
 outcome_options = ["All"] + sorted(df["Outcome"].dropna().unique().tolist())
 
 selected_gender = st.sidebar.selectbox(
@@ -348,7 +362,7 @@ with tab3:
 # REQUIRED CHART 1
 # ============================================================
 
-st.header(": Histogram — Patient Outcomes by Age")
+st.header("Required Chart 1: Histogram — Patient Outcomes by Age")
 
 fig1, ax1 = plt.subplots(figsize=(10, 5))
 
@@ -367,7 +381,7 @@ st.pyplot(fig1)
 # REQUIRED CHART 2
 # ============================================================
 
-st.header(": Line Chart — Admissions Over Time")
+st.header("Required Chart 2: Line Chart — Admissions Over Time")
 
 admissions = filtered_analyzer.admissions_over_time()
 
@@ -385,7 +399,7 @@ st.pyplot(fig2)
 # REQUIRED CHART 3
 # ============================================================
 
-st.header(": Bar Chart — Average Service Satisfaction by Department")
+st.header("Required Chart 3: Bar Chart — Average Service Satisfaction by Department")
 
 satisfaction = filtered_analyzer.satisfaction_by_department()
 
@@ -403,7 +417,7 @@ plt.xticks(rotation=45)
 st.pyplot(fig3)
 
 # ============================================================
-# COMMON DISEASES — FIXED SECTION
+# COMMON DISEASES
 # ============================================================
 
 st.header("Most Common Diseases or Conditions")
