@@ -383,7 +383,7 @@ st.pyplot(fig2)
 # REQUIRED CHART 3
 # ============================================================
 
-st.header("Required Chart 3: Bar Chart — Average Service Satisfaction by Department")
+st.header("Average Service Satisfaction by Department")
 
 satisfaction = filtered_analyzer.satisfaction_by_department()
 
