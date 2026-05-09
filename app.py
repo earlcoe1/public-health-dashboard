@@ -346,7 +346,7 @@ with tab3:
 # REQUIRED CHART 1
 # ============================================================
 
-st.header("Required Chart 1: Histogram — Patient Outcomes by Age")
+st.header("Patient Outcomes by Age")
 
 fig1, ax1 = plt.subplots(figsize=(10, 5))
 
